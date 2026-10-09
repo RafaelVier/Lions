@@ -1,0 +1,60 @@
+package org.lions.backend.infrastructure.persistence.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.lions.backend.domain.enums.Status;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "tb_lions_clubs")
+@EntityListeners(AuditingEntityListener.class)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class LionsClubJpaEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 120)
+    private String name;
+
+    @Column(length = 30)
+    private String clubNumber;
+
+    @Column(nullable = false, length = 20)
+    private String district; // ex: LD-1
+
+    @Column(length = 50)
+    private String region;
+
+    @Column(length = 80)
+    private String city;
+
+    @Column(length = 2)
+    private String state;
+
+    @Column(length = 10)
+    private String zipCode;
+
+    private LocalDate foundationDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Status status;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+}
