@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: lions-backend
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Springdoc OpenAPI (Swagger) Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    persist-authorization: true
+
+# Security / JWT Configuration
+lions:
+  security:
+    jwt:
+      secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+      expiration-ms: 86400000 # 24 horas
+
+# Management & Health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
