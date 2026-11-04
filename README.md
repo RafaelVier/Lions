@@ -62,11 +62,18 @@ A aplicação segue os princípios de separação de responsabilidades do DDD co
 ### frontend
 Projeto frontend
 
-### infra
-Definições de infraestrutura e manifestos de configuração
+### infra - Definições de infraestrutura e manifestos de configuração
+MER: https://lucid.app/lucidchart/4c0faa0a-7257-4d49-aa22-3be76df1b543/edit?viewport_loc=-1354%2C-371%2C1895%2C1003%2C0_0&invitationId=inv_9a4e1d8e-d762-467f-bb5f-3b2ee6f9e779
 
-### docs
-Documentação da aplicação, artefatos em geral (requisitos funcionais, requisitos não funcionais...)
+### DOCS
 
-### db
-Artefatos de banco de dados, scripts, migrations...
+#### Documentação de negócios:
+  - **Rquisitos:** https://docs.google.com/spreadsheets/d/1XApMBVegQe_ZXXPou89hw5Tg45RCIoCAEIXQ-1YhBBc/edit?gid=213998024#gid=213998024
+  - **Regras de Negócios:** https://docs.google.com/spreadsheets/d/1XApMBVegQe_ZXXPou89hw5Tg45RCIoCAEIXQ-1YhBBc/edit?gid=726238991#gid=726238991
+  - **Requisitos dicididos para trabalhar no momento:** https://docs.google.com/spreadsheets/d/1XApMBVegQe_ZXXPou89hw5Tg45RCIoCAEIXQ-1YhBBc/edit?gid=206774340#gid=206774340
+  - **Matrix rastreabilidade:** https://docs.google.com/spreadsheets/d/1XApMBVegQe_ZXXPou89hw5Tg45RCIoCAEIXQ-1YhBBc/edit?gid=998261716#gid=998261716
+  - **Casos de uso:** https://docs.google.com/spreadsheets/d/1XApMBVegQe_ZXXPou89hw5Tg45RCIoCAEIXQ-1YhBBc/edit?gid=425242948#gid=425242948
+  - **Protótipo front-end:** https://www.figma.com/design/PSJREjqnsyN5riXIEl8i58/Lions-Club?node-id=0-1&t=wMMIEU6MvO0QLVJz-1
+
+### Banco de dados
+  - **MER:** https://lucid.app/lucidchart/4c0faa0a-7257-4d49-aa22-3be76df1b543/edit?viewport_loc=-1354%2C-371%2C1895%2C1003%2C0_0&invitationId=inv_9a4e1d8e-d762-467f-bb5f-3b2ee6f9e779
