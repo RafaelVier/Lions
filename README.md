@@ -8,6 +8,7 @@ API REST e regras de negócio desenvolvidas para a solução **OrtoEmpresta** (B
 
 #### 🛠️ Tecnologias
 - **Linguagem:** Java 21 (LTS)
+- **Build:** Gradle 8.14 (Kotlin DSL) via Gradle Wrapper
 - **Framework Principal:** Spring Boot 3.3.4
 - **Segurança:** Spring Security 6 com autenticação Stateless via JWT (JJWT 0.12.6) e RBAC (Roles)
 - **Persistência de Dados:** Spring Data JPA / Hibernate
@@ -40,8 +41,8 @@ A aplicação segue os princípios de separação de responsabilidades do DDD co
 #### ⚙️ Como Executar o Backend Localmente
 
 1. **Pré-requisitos:**
-   - Java 21 instalado
-   - Maven 3.9+ instalado
+   - Java 21 instalado (via [SDKMAN](https://sdkman.io/): `sdk install java 21.0.11-tem`)
+   - Não é necessário instalar o Gradle: o projeto usa o Gradle Wrapper (`gradlew`)
 
 2. **Entrar no diretório do backend:**
    ```bash
@@ -50,7 +51,14 @@ A aplicação segue os princípios de separação de responsabilidades do DDD co
 
 3. **Executar a aplicação (Perfil `dev` com banco H2 em memória):**
    ```bash
-   mvn spring-boot:run
+   ./gradlew bootRun
+   ```
+   No Windows: `gradlew.bat bootRun`
+
+   Outros comandos úteis:
+   ```bash
+   ./gradlew build   # compila e roda os testes
+   ./gradlew test    # roda apenas os testes
    ```
 
 4. **Acessar a documentação interativa da API:**
