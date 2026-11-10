@@ -1,0 +1,12 @@
+# Regra padrão para o repositório todo
+*              @RafaelVier @GiovaneAguirre77
+
+# Mapeamento por pastas específicas
+/backend/src/  @FernandoZang @TheVingance
+/db/           @HerickCallegari
+/docs/         @ambarussian
+/frontend/     @rafavieira1
+/infra/        @paladini-qa
+
+# Configurações de infra/CI exigem ambos
+/.github/      @RafaelVier
