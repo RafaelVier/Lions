@@ -1,10 +1,14 @@
 package org.lions.backend.domain.enums;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 public enum LoanStatus {
+    PENDENTE_ASSINATURA("Pendente de assinatura"),
     ATIVO("Ativo"),
-    RENOVADO("Renovado"),
+    ATRASADO("Atrasado"),
     DEVOLVIDO("Devolvido"),
-    ATRASADO("Atrasado");
+    CANCELADO("Cancelado");
 
     private final String description;
 
@@ -14,5 +18,13 @@ public enum LoanStatus {
 
     public String getDescription() {
         return description;
+    }
+
+    public boolean isOpen() {
+        return this == PENDENTE_ASSINATURA || this == ATIVO || this == ATRASADO;
+    }
+
+    public static Set<LoanStatus> openStatuses() {
+        return EnumSet.of(PENDENTE_ASSINATURA, ATIVO, ATRASADO);
     }
 }

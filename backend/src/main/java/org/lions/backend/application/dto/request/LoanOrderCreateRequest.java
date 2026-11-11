@@ -44,8 +44,6 @@ public class LoanOrderCreateRequest {
     @NotNull(message = "O tipo de equipamento é obrigatório.")
     private EquipmentType equipmentType;
 
-    private Integer quantity; // Padrão: 1
-
     @NotBlank(message = "O motivo da necessidade do equipamento é obrigatório.")
     private String needReason; // Dado sensível de saúde protegido pela LGPD
 

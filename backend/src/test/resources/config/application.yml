@@ -1,0 +1,29 @@
+# Configuração de testes: sobrescreve src/main/resources/application.yml (config/ tem precedência no classpath)
+spring:
+  profiles:
+    active: test
+  datasource:
+    url: jdbc:h2:mem:lionstest;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: false
+
+lions:
+  scheduling:
+    enabled: false
+  storage:
+    base-dir: ./build/test-storage
+
+logging:
+  level:
+    org.lions: INFO

@@ -3,52 +3,56 @@ package org.lions.backend.domain.entity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.lions.backend.domain.enums.EquipmentCondition;
-import org.lions.backend.domain.enums.LoanStatus;
 import org.lions.backend.domain.enums.ReturnCondition;
+import org.lions.backend.domain.exception.BusinessException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * Entidade de Domínio (DDD): Devolução do Equipamento
- */
+/** Registro imutável da devolução de um empréstimo (RN24/RN25). */
 @Getter
-@Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class LoanReturn {
 
-    private Long id;
-    private Loan loan;
-    private LocalDate returnDate;
-    private ReturnCondition returnCondition;
-    private String damageDescription;
-    private String returnPhotoUrl;
-    private boolean hasDamage;
-    private boolean responsibilityAssigned;
-    private LocalDateTime createdAt;
+    private final Long id;
+    private final Long loanId;
+    private final LocalDate returnDate;
+    private final ReturnCondition returnCondition;
+    private final String damageDescription;
+    private final String returnPhotoUrl;
+    private final boolean hasDamage;
+    private final String receivedBy;
+    private final LocalDateTime createdAt;
 
-    public void processReturn() {
+    /** Cria a devolução validando a RN24 (condição obrigatória; avaria exige descrição). */
+    public static LoanReturn register(Long loanId, LocalDate returnDate, ReturnCondition condition,
+                                      String damageDescription, String returnPhotoUrl, String receivedBy) {
+        if (loanId == null) {
+            throw new BusinessException("Empréstimo da devolução é obrigatório.");
+        }
         if (returnDate == null) {
-            returnDate = LocalDate.now();
+            throw new BusinessException("Data da devolução é obrigatória.");
         }
-        if (loan != null) {
-            loan.setStatus(LoanStatus.DEVOLVIDO);
-            Equipment equipment = loan.getEquipment();
-            if (equipment != null) {
-                if (ReturnCondition.DANIFICADO.equals(returnCondition)) {
-                    this.hasDamage = true;
-                    equipment.markAsReturned(EquipmentCondition.EM_MANUTENCAO);
-                } else if (ReturnCondition.PRECISA_MANUTENCAO.equals(returnCondition)) {
-                    equipment.markAsReturned(EquipmentCondition.EM_MANUTENCAO);
-                } else {
-                    equipment.markAsReturned(EquipmentCondition.USADO);
-                }
-            }
+        if (condition == null) {
+            throw new BusinessException("Condição do equipamento na devolução é obrigatória.");
         }
+        boolean damaged = condition == ReturnCondition.DANIFICADO;
+        if (damaged && (damageDescription == null || damageDescription.isBlank())) {
+            throw new BusinessException("Devolução com dano exige a descrição da avaria.");
+        }
+        return LoanReturn.builder()
+                .loanId(loanId)
+                .returnDate(returnDate)
+                .returnCondition(condition)
+                .damageDescription(damageDescription)
+                .returnPhotoUrl(returnPhotoUrl)
+                .hasDamage(damaged)
+                .receivedBy(receivedBy)
+                .build();
+    }
+
+    public boolean needsMaintenance() {
+        return returnCondition != null && returnCondition != ReturnCondition.BOM_ESTADO;
     }
 }

@@ -26,6 +26,9 @@ public class UserJpaEntity {
     @Column(nullable = false, unique = true, length = 50)
     private String username;
 
+    @Column(length = 120)
+    private String fullName;
+
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
@@ -38,6 +41,8 @@ public class UserJpaEntity {
 
     @Column(nullable = false)
     private boolean active;
+
+    private LocalDateTime lastLoginAt;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
