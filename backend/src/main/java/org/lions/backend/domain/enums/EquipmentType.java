@@ -4,7 +4,8 @@ public enum EquipmentType {
     CADEIRA_DE_RODAS("Cadeira de Rodas"),
     CADEIRA_DE_BANHO("Cadeira de Banho"),
     ANDADOR("Andador"),
-    MULETAS("Muletas");
+    MULETAS("Muletas"),
+    OUTROS("Outros");
 
     private final String description;
 

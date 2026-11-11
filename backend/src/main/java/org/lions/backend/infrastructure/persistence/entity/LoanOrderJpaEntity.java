@@ -11,7 +11,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tb_loan_orders")
+@Table(name = "tb_loan_orders", indexes = {
+        @Index(name = "idx_loan_order_status", columnList = "status"),
+        @Index(name = "idx_loan_order_beneficiary", columnList = "beneficiary_id")
+})
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -24,23 +27,40 @@ public class LoanOrderJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "requester_id", nullable = false)
-    private RequesterJpaEntity requester;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "beneficiary_id", nullable = false)
+    private BeneficiaryJpaEntity beneficiary;
+
+    @Column(nullable = false)
+    private boolean forSelf;
+
+    @Column(length = 150)
+    private String requesterName;
+
+    @Column(length = 60)
+    private String requesterRelationship;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
     private EquipmentType equipmentType;
 
-    @Column(nullable = false)
-    private Integer quantity;
+    @Column(columnDefinition = "TEXT")
+    private String needReason; // LGPD: dado sensível
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private OrderStatus status;
 
-    @Column(length = 255)
+    @Column(length = 500)
     private String rejectionReason;
+
+    @Column(nullable = false)
+    private boolean assistedRegistration;
+
+    @Column(length = 50)
+    private String decidedBy;
+
+    private LocalDateTime decidedAt;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

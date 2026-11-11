@@ -3,6 +3,9 @@ spring:
     name: lions-backend
   profiles:
     active: dev
+  # Migrations aguardam o MER final; enquanto não houver scripts o schema é gerado pelo Hibernate (ddl-auto)
+  flyway:
+    enabled: false
 
 server:
   port: 8080
@@ -21,14 +24,27 @@ springdoc:
     try-it-out-enabled: true
     persist-authorization: true
 
-# Security / JWT Configuration
+# Lions — segurança, armazenamento, rotinas e CORS
 lions:
   security:
     jwt:
-      secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-      expiration-ms: 86400000 # 24 horas
+      # Em produção defina LIONS_JWT_SECRET (Base64, >= 256 bits); o default é apenas para desenvolvimento
+      secret: ${LIONS_JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      expiration-ms: 1800000 # 30 minutos
+    default-admin:
+      username: ${LIONS_ADMIN_USERNAME:marcio}
+      password: ${LIONS_ADMIN_PASSWORD:Lions@123}
+      email: ${LIONS_ADMIN_EMAIL:marcio@lionsmedianeira.org.br}
+  storage:
+    base-dir: ${LIONS_STORAGE_DIR:./data/storage}
+  scheduling:
+    enabled: true
+  cors:
+    # Lista de origens (padrões aceitos, ex.: https://*.lionsmedianeira.org.br)
+    allowed-origins:
+      - "*"
 
-# Management & Health
+# Management & Health (somente /actuator/health é público)
 management:
   endpoints:
     web:

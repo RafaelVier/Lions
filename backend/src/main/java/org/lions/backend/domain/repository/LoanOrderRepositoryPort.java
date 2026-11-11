@@ -8,8 +8,14 @@ import java.util.Optional;
 
 public interface LoanOrderRepositoryPort {
     LoanOrder save(LoanOrder order);
+
     Optional<LoanOrder> findById(Long id);
+
     List<LoanOrder> findAll();
+
     List<LoanOrder> findByStatus(OrderStatus status);
+
+    List<LoanOrder> findByBeneficiaryId(Long beneficiaryId);
+
     long countByStatus(OrderStatus status);
 }

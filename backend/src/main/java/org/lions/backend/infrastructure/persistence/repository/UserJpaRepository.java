@@ -1,5 +1,6 @@
 package org.lions.backend.infrastructure.persistence.repository;
 
+import org.lions.backend.domain.enums.UserRole;
 import org.lions.backend.infrastructure.persistence.entity.UserJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -9,7 +10,12 @@ import java.util.Optional;
 @Repository
 public interface UserJpaRepository extends JpaRepository<UserJpaEntity, Long> {
     Optional<UserJpaEntity> findByUsername(String username);
+
     Optional<UserJpaEntity> findByEmail(String email);
+
     boolean existsByUsername(String username);
+
     boolean existsByEmail(String email);
+
+    long countByRoleAndActiveTrue(UserRole role);
 }
