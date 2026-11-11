@@ -67,6 +67,18 @@ A aplicação segue os princípios de separação de responsabilidades do DDD co
    - **Console H2 (Dev):** [http://localhost:8080/h2-console](http://localhost:8080/h2-console) (JDBC URL: `jdbc:h2:mem:lionsdb`, Usuário: `sa`, Senha em branco)
 
 
+### rag
+
+Serviço de respostas em Python 3.13. Para instalar as dependências, iniciar o serviço e executar os testes, com o `uv` instalado:
+
+```bash
+cd rag
+uv sync --locked
+uv run --locked uvicorn rag_service.main:app
+```
+
+Em outro terminal, na pasta `rag`, execute `uv run --locked pytest`. O serviço expõe `/health/live` e `/health/ready`; nesta etapa, a prontidão retorna HTTP 503 porque o processamento de consultas ainda não foi implementado.
+
 ### frontend
 Projeto frontend
 
