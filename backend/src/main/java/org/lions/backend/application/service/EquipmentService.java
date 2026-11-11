@@ -30,7 +30,7 @@ public class EquipmentService {
             log.info("Inicializando acervo ortopédico com equipamentos exemplo...");
             // Exemplo baseado nos wireframes: PT-0142, PT-0087, PT-0053, etc.
             createSeedItem("PT-0142", EquipmentType.CADEIRA_DE_RODAS, EquipmentCondition.SEMINOVO, EquipmentStatus.DISPONIVEL, "Cadeira de rodas dobrável");
-            createSeedItem("PT-0087", EquipmentType.ANDADOR, EquipmentCondition.BOM_ESTADO_OU_SEMINOVO(), EquipmentStatus.DISPONIVEL, "Andador de alumínio com 4 rodas");
+            createSeedItem("PT-0087", EquipmentType.ANDADOR, BOM_ESTADO_OU_SEMINOVO(), EquipmentStatus.DISPONIVEL, "Andador de alumínio com 4 rodas");
             createSeedItem("PT-0053", EquipmentType.CADEIRA_DE_BANHO, EquipmentCondition.USADO, EquipmentStatus.DISPONIVEL, "Cadeira higiênica para banho");
             createSeedItem("PT-0019", EquipmentType.MULETAS, EquipmentCondition.NOVO, EquipmentStatus.DISPONIVEL, "Par de muletas canadenses ajustáveis");
             createSeedItem("PT-0020", EquipmentType.CADEIRA_DE_RODAS, EquipmentCondition.USADO, EquipmentStatus.DISPONIVEL, "Cadeira de rodas para adulto");
