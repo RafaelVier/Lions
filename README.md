@@ -74,10 +74,12 @@ Serviço de respostas em Python 3.13. Para instalar as dependências, iniciar o 
 ```bash
 cd rag
 uv sync --locked
-uv run --locked uvicorn rag_service.main:app
+uv run --locked uvicorn ragservice.main:app
 ```
 
 Em outro terminal, na pasta `rag`, execute `uv run --locked pytest`. O serviço expõe `/health/live` e `/health/ready`; nesta etapa, a prontidão retorna HTTP 503 porque o processamento de consultas ainda não foi implementado.
+
+O módulo de extração oferece funções internas para TXT/Markdown em UTF-8 e PDF com texto extraível, com limite de 5 MiB por arquivo. A extração de PDF preserva a ordem das páginas e não realiza OCR. Essas funções ainda não estão disponíveis por upload na API.
 
 ### frontend
 Projeto frontend

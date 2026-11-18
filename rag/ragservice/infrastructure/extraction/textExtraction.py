@@ -1,15 +1,16 @@
 from pathlib import PurePath
 
-MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024
+from ragservice.infrastructure.extraction.documentLimits import MAX_DOCUMENT_SIZE_BYTES
+
 SUPPORTED_EXTENSIONS = {".txt", ".md"}
 
 
 class TextExtractionError(ValueError):
-    """Indica que um arquivo não pode ser processado como texto."""
+    pass
 
 
-def extract_text(filename: str, content: bytes) -> str:
-    if PurePath(filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
+def extractText(fileName: str, content: bytes) -> str:
+    if PurePath(fileName).suffix.lower() not in SUPPORTED_EXTENSIONS:
         raise TextExtractionError("Formato não suportado: use TXT ou Markdown.")
 
     if len(content) > MAX_DOCUMENT_SIZE_BYTES:

@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 
-from rag_service.main import app
+from ragservice.main import app
 
 
-def test_live_reports_running_service() -> None:
+def testLiveReportsRunningService() -> None:
     with TestClient(app) as client:
         response = client.get("/health/live")
 
@@ -11,7 +11,7 @@ def test_live_reports_running_service() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_ready_reports_service_cannot_answer_queries_yet() -> None:
+def testReadyReportsServiceCannotAnswerQueriesYet() -> None:
     with TestClient(app) as client:
         response = client.get("/health/ready")
 
