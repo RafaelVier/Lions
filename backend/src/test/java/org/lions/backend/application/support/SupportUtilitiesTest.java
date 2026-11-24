@@ -92,7 +92,8 @@ class SupportUtilitiesTest {
 
     @Test
     void deveCitarDataQuandoGerarMensagensPadrao() {
-        String reminder = whatsApp.dueDateReminderMessage("Maria", "Andador", "PT-0001", LocalDate.of(2025, 3, 17));
+        String reminder = whatsApp.dueDateReminderMessage("Maria", "Andador", "PT-0001", LocalDate.of(2025, 3, 17),
+                true);
         String overdue = whatsApp.overdueMessage("Maria", "Andador", null, LocalDate.of(2025, 3, 9));
         String reserved = whatsApp.reservationAvailableMessage("Maria", "Andador", "PT-0001",
                 LocalDateTime.of(2025, 3, 12, 14, 30));
@@ -100,5 +101,15 @@ class SupportUtilitiesTest {
         assertThat(reminder).contains("Maria", "Andador (PT-0001)", "17/03/2025").doesNotContain("90 dias");
         assertThat(overdue).contains("venceu em 09/03/2025").doesNotContain("(null)");
         assertThat(reserved).contains("12/03/2025 às 14:30");
+    }
+
+    @Test
+    void deveMencionarRenovacaoSomenteQuandoElegivel() {
+        LocalDate due = LocalDate.of(2025, 3, 17);
+        assertThat(whatsApp.dueDateReminderMessage("Maria", "Andador", "PT-0001", due, true)).contains("renovado");
+        assertThat(whatsApp.dueDateReminderMessage("Maria", "Andador", "PT-0001", due, false))
+                .doesNotContain("renov").contains("programe a devolução");
+        assertThat(whatsApp.dueTodayMessage("Maria", "Andador", "PT-0001", due, true)).contains("vence hoje", "renovado");
+        assertThat(whatsApp.dueTodayMessage("Maria", "Andador", "PT-0001", due, false)).doesNotContain("renov");
     }
 }

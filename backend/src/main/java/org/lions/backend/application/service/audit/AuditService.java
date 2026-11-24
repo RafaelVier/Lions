@@ -1,9 +1,11 @@
 package org.lions.backend.application.service.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.lions.backend.application.dto.response.AuditLogResponse;
 import org.lions.backend.application.port.CurrentUserPort;
 import org.lions.backend.domain.entity.AuditLog;
 import org.lions.backend.domain.enums.AuditAction;
@@ -102,6 +104,30 @@ public class AuditService {
     @Transactional(readOnly = true)
     public List<AuditLog> search(String entityName, String entityId, LocalDateTime from, LocalDateTime to) {
         return auditLogRepository.search(entityName, entityId, from, to);
+    }
+
+    /** Consulta da trilha (RN58) já convertida para resposta da API, com {@code details} como JSON. */
+    @Transactional(readOnly = true)
+    public List<AuditLogResponse> searchResponses(String entityName, String entityId, LocalDateTime from,
+                                                  LocalDateTime to) {
+        return search(entityName, entityId, from, to).stream().map(this::toResponse).toList();
+    }
+
+    public AuditLogResponse toResponse(AuditLog log) {
+        return new AuditLogResponse(log.getId(), log.getEntityName(), log.getEntityId(), log.getAction(),
+                log.getAction() != null ? log.getAction().getDescription() : null, log.getUsername(),
+                log.isAutomatic(), log.getOriginRule(), parseDetails(log.getDetails()), log.getOccurredAt());
+    }
+
+    private JsonNode parseDetails(String details) {
+        if (details == null || details.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(details);
+        } catch (JsonProcessingException e) {
+            return objectMapper.getNodeFactory().textNode(details);
+        }
     }
 
     private AuditLog persist(String entityName, Object entityId, AuditAction action, String username,

@@ -155,9 +155,9 @@ public class MaintenanceService {
     /** RN37 — APTO → DISPONIVEL (entra na alocação da fila); INSERVIVEL → baixa (somente Admin). */
     @Transactional
     public MaintenanceResponse close(Long id, MaintenanceCloseRequest request) {
-        if (request.verdict() == MaintenanceVerdict.INSERVIVEL && !currentUser.hasRole(UserRole.ROLE_ADMIN)) {
-            throw new ForbiddenOperationException("Somente o Administrador pode encerrar manutenção com parecer "
-                    + "INSERVÍVEL (baixa do equipamento).");
+        if (!currentUser.hasRole(UserRole.ROLE_ADMIN)) {
+            // UC23 — o encerramento com parecer (APTO ou INSERVIVEL) é do Administrador
+            throw new ForbiddenOperationException("Somente o Administrador pode encerrar manutenção (UC23).");
         }
         Maintenance maintenance = find(id);
         LocalDate today = LocalDate.now(clock);

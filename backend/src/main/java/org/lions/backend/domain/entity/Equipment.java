@@ -13,7 +13,12 @@ import org.lions.backend.domain.exception.BusinessException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -23,11 +28,17 @@ import java.util.Objects;
 public class Equipment {
 
     public static final String PATRIMONY_FORMAT = "PT-%04d";
+    public static final int MIN_MANUFACTURE_YEAR = 1900;
 
     private Long id;
     private String patrimonyNumber;
     private EquipmentType type;
     private String size;
+    /** Ano de fabricação/aquisição (opcional; MER: ano). */
+    private Integer manufactureYear;
+    /** Especificações livres nome/valor (MER: tb_especificacao). */
+    @Builder.Default
+    private List<EquipmentSpecification> specifications = new ArrayList<>();
     private EquipmentCondition condition;
     @Builder.Default
     private EquipmentStatus status = EquipmentStatus.DISPONIVEL;
@@ -52,13 +63,29 @@ public class Equipment {
         return String.format(PATRIMONY_FORMAT, id);
     }
 
-    /** RN14 — tipo e conservação obrigatórios. */
+    /** RN14 — tipo e conservação obrigatórios; ano e especificações consistentes. */
     public void validate() {
         if (type == null) {
             throw new BusinessException("Tipo do equipamento é obrigatório.");
         }
         if (condition == null) {
             throw new BusinessException("Estado de conservação é obrigatório.");
+        }
+        if (manufactureYear != null && manufactureYear < MIN_MANUFACTURE_YEAR) {
+            throw new BusinessException("Ano do equipamento inválido.");
+        }
+        if (specifications == null) {
+            specifications = new ArrayList<>();
+        }
+        Set<String> names = new HashSet<>();
+        for (EquipmentSpecification spec : specifications) {
+            if (spec == null || spec.name() == null || spec.name().isBlank()
+                    || spec.value() == null || spec.value().isBlank()) {
+                throw new BusinessException("Especificação do equipamento exige nome e valor.");
+            }
+            if (!names.add(spec.name().trim().toLowerCase(Locale.ROOT))) {
+                throw new BusinessException("Especificação repetida: " + spec.name().trim() + ".");
+            }
         }
         if (status == null) {
             status = EquipmentStatus.DISPONIVEL;

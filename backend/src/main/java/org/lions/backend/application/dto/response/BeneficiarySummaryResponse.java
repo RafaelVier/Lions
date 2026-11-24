@@ -1,16 +1,14 @@
 package org.lions.backend.application.dto.response;
 
 import org.lions.backend.domain.entity.Beneficiary;
-import org.lions.backend.domain.enums.DocumentType;
 
 import java.time.LocalDateTime;
 
-/** Item de listagem de beneficiários — documento sempre mascarado (LGPD). */
+/** Item de listagem de beneficiários — CPF sempre mascarado (LGPD). */
 public record BeneficiarySummaryResponse(
         Long id,
         String fullName,
-        DocumentType documentType,
-        String maskedDocument,
+        String maskedCpf,
         String phone,
         String city,
         String state,
@@ -19,7 +17,7 @@ public record BeneficiarySummaryResponse(
         LocalDateTime createdAt) {
 
     public static BeneficiarySummaryResponse from(Beneficiary b) {
-        return new BeneficiarySummaryResponse(b.getId(), b.getFullName(), b.getDocumentType(), b.getMaskedDocument(),
+        return new BeneficiarySummaryResponse(b.getId(), b.getFullName(), b.getMaskedCpf(),
                 b.getPhone(), b.getCity(), b.getState(), b.isActive(), b.isAnonymized(), b.getCreatedAt());
     }
 }

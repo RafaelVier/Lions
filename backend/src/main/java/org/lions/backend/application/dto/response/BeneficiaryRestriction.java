@@ -33,10 +33,10 @@ public record BeneficiaryRestriction(
     }
 
     /**
-     * RN34 — bloqueio que remove o beneficiário da fila: atraso, ocorrência aberta ou cadastro inativo.
-     * Termo pendente de assinatura é transitório: impede novas entradas, mas não tira a posição já existente.
+     * RN34 — beneficiário bloqueado (RN20: atraso, termo pendente de assinatura, ocorrência aberta) ou inativo é
+     * removido da fila.
      */
     public boolean removesFromWaitlist() {
-        return hasOverdueLoan || hasOpenOccurrence || inactive;
+        return hasOverdueLoan || hasPendingSignature || hasOpenOccurrence || inactive;
     }
 }

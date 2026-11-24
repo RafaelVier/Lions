@@ -24,7 +24,6 @@ import org.lions.backend.domain.entity.Beneficiary;
 import org.lions.backend.domain.entity.Loan;
 import org.lions.backend.domain.entity.LoanOrder;
 import org.lions.backend.domain.enums.AuditAction;
-import org.lions.backend.domain.enums.DocumentType;
 import org.lions.backend.domain.enums.NotificationChannel;
 import org.lions.backend.domain.enums.OccurrenceStatus;
 import org.lions.backend.domain.exception.BusinessException;
@@ -64,10 +63,10 @@ public class BeneficiaryService {
 
     public static final String ENTITY_NAME = "Beneficiary";
     private static final String[] AUDITED_FIELDS = {
-            "fullName", "documentType", "documentNumber", "birthDate", "phone", "email", "cep", "street", "number",
+            "fullName", "cpf", "birthDate", "phone", "email", "cep", "street", "number",
             "complement", "neighborhood", "city", "state", "alternativeContactName", "alternativeContactPhone",
-            "alternativeContactRelationship", "legallyIncapable", "legalGuardianName", "legalGuardianDocument",
-            "legalGuardianPhone", "legalGuardianRelationship", "notes"};
+            "alternativeContactRelationship", "legallyIncapable", "legalGuardianName", "legalGuardianCpf",
+            "legalGuardianPhone", "legalGuardianEmail", "legalGuardianRelationship", "notes"};
 
     private final BeneficiaryRepositoryPort beneficiaryRepository;
     private final LoanRepositoryPort loanRepository;
@@ -98,13 +97,12 @@ public class BeneficiaryService {
             throw new BusinessException("O cadastro só pode ser efetivado com o consentimento (LGPD) do beneficiário "
                     + "ou do responsável legal.");
         }
-        DocumentType documentType = request.documentType() != null ? request.documentType() : DocumentType.CPF;
-        String document = normalizeDocument(documentType, request.documentNumber());
-        ensureNoActiveDuplicate(document, null);
+        String cpf = normalizeCpf(request.cpf());
+        ensureNoActiveDuplicate(cpf, null);
 
         LocalDate today = today();
-        Beneficiary beneficiary = Beneficiary.builder().documentType(documentType).build();
-        apply(beneficiary, request, documentType, document);
+        Beneficiary beneficiary = new Beneficiary();
+        apply(beneficiary, request, cpf);
         String givenBy = blankToNull(request.consentGivenBy());
         if (givenBy == null) {
             givenBy = beneficiary.requiresLegalGuardian(today)
@@ -115,8 +113,8 @@ public class BeneficiaryService {
         beneficiary.validate(today);
 
         Beneficiary saved = beneficiaryRepository.save(beneficiary);
-        Map<String, Object> details = AuditDetails.of("documentType", saved.getDocumentType(),
-                "maskedDocument", saved.getMaskedDocument(), "consentGivenBy", saved.getConsentGivenBy(),
+        Map<String, Object> details = AuditDetails.of(
+                "maskedCpf", saved.getMaskedCpf(), "consentGivenBy", saved.getConsentGivenBy(),
                 "notificationChannels", saved.getNotificationChannels());
         if (auditUsername != null) {
             auditService.recordAs(auditUsername, ENTITY_NAME, saved.getId(), AuditAction.CREATE, details);
@@ -126,11 +124,10 @@ public class BeneficiaryService {
         return saved;
     }
 
-    /** Beneficiário ativo com o documento (normalizado conforme o tipo). */
+    /** Beneficiário ativo com o CPF (aceita com ou sem máscara). */
     @Transactional(readOnly = true)
-    public Optional<Beneficiary> findActiveByDocument(DocumentType documentType, String documentNumber) {
-        DocumentType type = documentType != null ? documentType : DocumentType.CPF;
-        return beneficiaryRepository.findActiveByDocumentNumber(normalizeDocument(type, documentNumber));
+    public Optional<Beneficiary> findActiveByCpf(String cpf) {
+        return beneficiaryRepository.findActiveByCpf(normalizeCpf(cpf));
     }
 
     /** Lista com documento mascarado. Filtros opcionais e combináveis. */
@@ -138,11 +135,7 @@ public class BeneficiaryService {
     public List<BeneficiarySummaryResponse> findAll(String name, String document, Boolean active) {
         Stream<Beneficiary> stream;
         if (document != null && !document.isBlank()) {
-            String digits = CpfValidator.normalize(document);
-            stream = Stream.concat(
-                    beneficiaryRepository.findByDocumentNumber(document.trim()).stream(),
-                    digits.isEmpty() || digits.equals(document.trim()) ? Stream.empty()
-                            : beneficiaryRepository.findByDocumentNumber(digits).stream());
+            stream = beneficiaryRepository.findByCpf(normalizeCpf(document)).stream();
         } else if (name != null && !name.isBlank()) {
             stream = beneficiaryRepository.searchByName(name.trim()).stream();
         } else {
@@ -173,12 +166,11 @@ public class BeneficiaryService {
         if (beneficiary.isAnonymized()) {
             throw new BusinessException("Beneficiário anonimizado não pode ser editado.");
         }
-        DocumentType documentType = request.documentType() != null ? request.documentType() : DocumentType.CPF;
-        String document = normalizeDocument(documentType, request.documentNumber());
-        if (beneficiary.isActive() && !document.equals(beneficiary.getDocumentNumber())) {
-            ensureNoActiveDuplicate(document, id);
+        String cpf = normalizeCpf(request.cpf());
+        if (beneficiary.isActive() && !cpf.equals(beneficiary.getCpf())) {
+            ensureNoActiveDuplicate(cpf, id);
         }
-        apply(beneficiary, request, documentType, document);
+        apply(beneficiary, request, cpf);
         beneficiary.validate(today());
         Beneficiary saved = beneficiaryRepository.save(beneficiary);
         var changes = auditService.diff(before, saved, AUDITED_FIELDS);
@@ -237,7 +229,7 @@ public class BeneficiaryService {
     public BeneficiaryResponse reactivate(Long id) {
         Beneficiary beneficiary = find(id);
         if (!beneficiary.isAnonymized()) {
-            ensureNoActiveDuplicate(beneficiary.getDocumentNumber(), id);
+            ensureNoActiveDuplicate(beneficiary.getCpf(), id);
         }
         beneficiary.reactivate(LocalDateTime.now(clock));
         Beneficiary saved = beneficiaryRepository.save(beneficiary);
@@ -309,10 +301,9 @@ public class BeneficiaryService {
         return response;
     }
 
-    private void apply(Beneficiary b, BeneficiaryRequest r, DocumentType documentType, String document) {
+    private void apply(Beneficiary b, BeneficiaryRequest r, String cpf) {
         b.setFullName(trim(r.fullName()));
-        b.setDocumentType(documentType);
-        b.setDocumentNumber(document);
+        b.setCpf(cpf);
         b.setBirthDate(r.birthDate());
         b.setPhone(trim(r.phone()));
         b.setEmail(blankToNull(r.email()));
@@ -328,31 +319,27 @@ public class BeneficiaryService {
         b.setAlternativeContactRelationship(blankToNull(r.alternativeContactRelationship()));
         b.setLegallyIncapable(Boolean.TRUE.equals(r.legallyIncapable()));
         b.setLegalGuardianName(blankToNull(r.legalGuardianName()));
-        b.setLegalGuardianDocument(blankToNull(r.legalGuardianDocument()));
+        b.setLegalGuardianCpf(r.legalGuardianCpf() == null || r.legalGuardianCpf().isBlank()
+                ? null : normalizeCpf(r.legalGuardianCpf()));
         b.setLegalGuardianPhone(blankToNull(r.legalGuardianPhone()));
+        b.setLegalGuardianEmail(blankToNull(r.legalGuardianEmail()));
         b.setLegalGuardianRelationship(blankToNull(r.legalGuardianRelationship()));
         b.setNotes(blankToNull(r.notes()));
     }
 
-    /** RN04 — documento já cadastrado para beneficiário ativo → 409 com {@code existingId}. */
-    private void ensureNoActiveDuplicate(String document, Long ignoreId) {
-        beneficiaryRepository.findActiveByDocumentNumber(document)
+    /** RN04 — CPF já cadastrado para beneficiário ativo → 409 com {@code existingId}. */
+    private void ensureNoActiveDuplicate(String cpf, Long ignoreId) {
+        beneficiaryRepository.findActiveByCpf(cpf)
                 .filter(existing -> !Objects.equals(existing.getId(), ignoreId))
                 .ifPresent(existing -> {
-                    throw new ConflictException("Já existe beneficiário ativo com este documento.",
+                    throw new ConflictException("Já existe beneficiário ativo com este CPF.",
                             Map.of("existingId", existing.getId()));
                 });
     }
 
-    /** Só dígitos para CPF/CNPJ; estrangeiro sem espaços nas pontas e em maiúsculas. */
-    public static String normalizeDocument(DocumentType type, String document) {
-        if (document == null) {
-            return null;
-        }
-        if (type == DocumentType.ESTRANGEIRO) {
-            return document.trim().toUpperCase(Locale.ROOT);
-        }
-        return CpfValidator.normalize(document);
+    /** CPF somente com dígitos. */
+    public static String normalizeCpf(String cpf) {
+        return cpf == null ? null : CpfValidator.normalize(cpf);
     }
 
     private static Set<NotificationChannel> channels(Set<NotificationChannel> channels) {

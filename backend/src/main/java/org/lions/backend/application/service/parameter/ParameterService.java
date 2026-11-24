@@ -5,11 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.lions.backend.application.dto.response.SystemParameterResponse;
 import org.lions.backend.application.port.CurrentUserPort;
 import org.lions.backend.application.service.audit.AuditService;
+import org.lions.backend.domain.entity.EquipmentTypeConfig;
 import org.lions.backend.domain.entity.SystemParameter;
 import org.lions.backend.domain.enums.AuditAction;
 import org.lions.backend.domain.enums.EquipmentType;
 import org.lions.backend.domain.exception.BusinessException;
 import org.lions.backend.domain.exception.ResourceNotFoundException;
+import org.lions.backend.domain.repository.EquipmentTypeConfigRepositoryPort;
 import org.lions.backend.domain.repository.SystemParameterRepositoryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +27,7 @@ import java.util.Optional;
 
 /**
  * Parâmetros de sistema (prazos e limites) com defaults. Todos os parâmetros conhecidos são inteiros positivos.
- * {@code loan.days.<TIPO>} sobrescreve o prazo padrão para um tipo de equipamento.
+ * O prazo por tipo de equipamento (RN18) fica em {@code tb_equipment_types} ({@link EquipmentTypeConfig}).
  */
 @Slf4j
 @Service
@@ -35,7 +37,6 @@ public class ParameterService {
     public static final String ENTITY_NAME = "SystemParameter";
 
     public static final String LOAN_DEFAULT_DAYS = "loan.default-days";
-    public static final String LOAN_DAYS_PREFIX = "loan.days.";
     public static final String LOAN_MAX_ACTIVE_PER_BENEFICIARY = "loan.max-active-per-beneficiary";
     public static final String LOAN_MAX_RENEWALS = "loan.max-renewals";
     public static final String LOAN_RENEWAL_WINDOW_DAYS = "loan.renewal-window-days";
@@ -69,6 +70,7 @@ public class ParameterService {
     }
 
     private final SystemParameterRepositoryPort repository;
+    private final EquipmentTypeConfigRepositoryPort equipmentTypeRepository;
     private final AuditService auditService;
     private final CurrentUserPort currentUser;
     private final Clock clock;
@@ -76,17 +78,12 @@ public class ParameterService {
     public record Definition(int defaultValue, String description) {
     }
 
-    /** Todos os parâmetros conhecidos (inclui {@code loan.days.<TIPO>}), com valor efetivo e default. */
+    /** Todos os parâmetros conhecidos, com valor efetivo e default. */
     @Transactional(readOnly = true)
     public List<SystemParameterResponse> findAll() {
         List<SystemParameterResponse> result = new ArrayList<>();
         DEFINITIONS.forEach((key, definition) ->
                 result.add(toResponse(key, definition.defaultValue(), definition.description())));
-        int defaultDays = loanDefaultDays();
-        for (EquipmentType type : EquipmentType.values()) {
-            result.add(toResponse(LOAN_DAYS_PREFIX + type.name(), defaultDays,
-                    "Prazo do empréstimo para " + type.getDescription() + " (dias; vazio = prazo padrão)"));
-        }
         return result;
     }
 
@@ -129,9 +126,13 @@ public class ParameterService {
         return getInt(LOAN_DEFAULT_DAYS);
     }
 
-    /** Prazo para o tipo ({@code loan.days.<TIPO>}) ou o prazo padrão. */
+    /** RN18 — prazo configurado para o tipo ({@code tb_equipment_types.loan_days}) ou o prazo padrão. */
+    @Transactional(readOnly = true)
     public int loanDays(EquipmentType type) {
-        return storedValue(LOAN_DAYS_PREFIX + type.name()).orElseGet(this::loanDefaultDays);
+        int defaultDays = loanDefaultDays();
+        return equipmentTypeRepository.findByCode(type)
+                .map(config -> config.effectiveLoanDays(defaultDays))
+                .orElse(defaultDays);
     }
 
     public int maxActiveLoansPerBeneficiary() {
@@ -179,21 +180,7 @@ public class ParameterService {
     }
 
     public static boolean isKnownKey(String key) {
-        if (key == null) {
-            return false;
-        }
-        if (DEFINITIONS.containsKey(key)) {
-            return true;
-        }
-        if (key.startsWith(LOAN_DAYS_PREFIX)) {
-            String type = key.substring(LOAN_DAYS_PREFIX.length());
-            for (EquipmentType candidate : EquipmentType.values()) {
-                if (candidate.name().equals(type)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return key != null && DEFINITIONS.containsKey(key);
     }
 
     private Optional<Integer> storedValue(String key) {
@@ -207,16 +194,11 @@ public class ParameterService {
     }
 
     private int defaultOf(String key) {
-        Definition definition = DEFINITIONS.get(key);
-        return definition != null ? definition.defaultValue() : loanDefaultDays();
+        return DEFINITIONS.get(key).defaultValue();
     }
 
     private String descriptionOf(String key) {
-        Definition definition = DEFINITIONS.get(key);
-        if (definition != null) {
-            return definition.description();
-        }
-        return "Prazo do empréstimo para " + key.substring(LOAN_DAYS_PREFIX.length()) + " (dias)";
+        return DEFINITIONS.get(key).description();
     }
 
     private SystemParameterResponse toResponse(String key, int defaultValue, String description) {

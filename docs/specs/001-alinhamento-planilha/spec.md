@@ -1,9 +1,14 @@
 # Spec 001 — Alinhamento do backend à planilha de requisitos
 
-> **Fonte de verdade:** planilha "Requisitos / Regras de Negócio / Casos de Uso / Matriz" linkada no `README.md`.
-> Em caso de conflito com `docs/DESCRICAO_DO_PROJETO_E_BACKEND.md`, **prevalece a planilha**.
-> **MER:** ainda não disponível (Lucidchart exige login). As entidades seguem a coluna "Entidades principais" da Matriz.
-> Campos cuja necessidade é incerta são **opcionais** (nullable) e marcados com `(opc.)` no `plan.md`, para revisão quando o MER for anexado.
+> **Fonte de verdade:** planilha linkada no `README.md`, abas **"Requisitos - Final"**, **"Regras de negócio - Sugestões"**
+> (RN01–RN61), **"Casos de Uso"** e **"Banco de Dados"** (MER). Em caso de conflito com
+> `docs/DESCRICAO_DO_PROJETO_E_BACKEND.md`, **prevalece a planilha**.
+> **MER:** export do Lucidchart ajustado a esta spec em `docs/banco-de-dados/MER.json` (lógico, nomes em português);
+> o schema físico é `backend/src/main/resources/db/migration/V1__init_schema.sql` (PostgreSQL, nomes em inglês).
+> O mapeamento e a lista de ajustes estão em `docs/banco-de-dados/README.md`.
+> **Revisão de 24/11/2026:** spec alinhada à planilha nos pontos que divergiam (RN04, RN34, RN40, RN57, RN60, RF12,
+> RF15, UC16, UC23) e ao MER (endereço próprio, tipo de equipamento como tabela, ano e especificações).
+> O estado de implementação de cada item **[rev. 24/11]** está na Frente G do `tasks.md`.
 
 ## 1. Objetivo
 
@@ -25,18 +30,19 @@ Levar o backend (Spring Boot 3 / Java 21 / DDD) do estado atual — domínio par
 | RF09 | Histórico do assistido | ✅ |
 | RF10 | Histórico de empréstimos / auditoria | ✅ |
 | RF11 | Relatórios (PDF e CSV) | ✅ (Excel via CSV) |
-| RF12 | Notificações automáticas | ✅ (canal real = adaptador de log/wa.me; provedores reais SMS/e-mail ficam como porta) |
+| RF12 | Notificações automáticas | ✅ envio automático pelos canais autorizados (e-mail, SMS, WhatsApp) via porta de envio; contato manual só como contingência (RN47/RN48) |
 | RF13 | Assistente inteligente | 🟡 parcial: assistente **baseado em regras** (sugestão de alocação + FAQ). Integração com LLM fica atrás de uma porta, fora do escopo |
 | RF14 | Onboarding / ajuda | ✅ backend do conteúdo de ajuda (RN53); UI é do frontend |
 | RF15 | Dashboard | ✅ |
 | — | Pedido público (fluxo do wireframe / doc interno) | ✅ mantido como "Solicitação" que alimenta empréstimo ou fila |
 
+| RNF06 | Sincronização de dados / funcionamento offline (RN60) | ✅ backend: recebe lotes registrados offline e trata conflitos; armazenamento local e fila de envio são do frontend PWA |
+
 ### Fora do escopo (registrado para próximas specs)
-- Funcionamento offline e resolução de conflitos de sincronização (RN60) — depende do frontend PWA.
 - Recuperação de senha self-service por e-mail (UC03 parcial: troca de senha autenticada + redefinição pelo Admin entram).
-- Provedores reais de SMS/e-mail/WhatsApp Business API.
+- Contratação do provedor de SMS/WhatsApp (custo) — o backend entrega a porta e os adaptadores configuráveis; sem
+  provedor configurado o canal cai na contingência de contato manual (RN47/RN48).
 - Assistente com LLM (RN50–RN52 ficam garantidas pela porta e pelo caráter consultivo).
-- Migrations Flyway definitivas — aguardam o MER (dev segue com `ddl-auto: update`).
 - Reincorporação de equipamento baixado (comentário do professor na RN13) — conflita com RN12 ("Baixado é estado final"); depende de decisão do cliente.
 - Entidades fora da planilha (`LionsClub`, `Member`, `SocialAction`) permanecem intocadas.
 
@@ -57,16 +63,23 @@ Toda regra listada deve ter teste automatizado.
 - **RN02** Só Admin cria/edita/inativa usuários e altera perfis. Quando um Admin tenta alterar o **próprio** perfil → `422`. Admin não pode inativar a si mesmo.
 - **RN03** Usuário nunca é apagado fisicamente; inativação seta `active=false` e bloqueia login.
 - **RN57** Senha forte (≥ 8, maiúscula, minúscula, dígito e especial). Token JWT expira após **30 min**; `POST /auth/refresh` renova a sessão (inatividade = não renovar). `POST /auth/logout` revoga o token e registra o encerramento na auditoria. Login também é auditado.
+- **RN57 [rev. 24/11]** Encerramento **por inatividade** também é registrado: cada sessão (token `jti`) é persistida;
+  uma rotina marca as sessões expiradas sem logout e audita `SESSION_EXPIRED` (automático, RN52). A revogação de tokens
+  passa a ser persistida (sobrevive a reinício).
 - `/auth/register` público é **removido** (criação só por Admin).
 
 ### RF02 — Beneficiários (UC04–UC07)
-- **RN04** CPF válido (dígitos verificadores) quando `documentType=CPF`; não pode haver dois beneficiários **ativos** com o mesmo documento. Na duplicidade → `409` com `existingId` no corpo.
-- **RN05** Obrigatórios: nome completo, documento, data de nascimento, telefone, endereço (CEP, logradouro, número, bairro, cidade, UF) e contato alternativo (nome + telefone).
-- **RN06** Menor de 18 anos ou `legallyIncapable=true` exige responsável legal (nome + documento); o termo é emitido e assinado pelo responsável.
+- **RN04** O **CPF** é a única identificação do beneficiário (não há outros tipos de documento): obrigatório, válido
+  (dígitos verificadores) e armazenado só com dígitos; não pode haver dois beneficiários **ativos** com o mesmo CPF
+  (garantido também por índice único parcial no banco). Na duplicidade → `409` com `existingId` no corpo.
+- **RN05** Obrigatórios: nome completo, CPF, data de nascimento, telefone, endereço (CEP, logradouro, número — texto,
+  aceita "S/N" —, bairro, cidade, UF) e contato alternativo (nome + telefone). O endereço fica em tabela própria (1:1, MER `tb_endereco`).
+- **RN06** Menor de 18 anos ou `legallyIncapable=true` exige responsável legal (nome + **CPF** válido; telefone, e-mail e
+  parentesco opcionais); o termo é emitido e assinado pelo responsável.
 - **RN07** Cadastro só é efetivado com consentimento (`consentGranted=true`) com data/hora gravada pelo sistema e com os canais de notificação autorizados (pode ser vazio).
 - **RN08** Inativação recusada (`422`) se houver empréstimo não encerrado, ocorrência aberta ou posição ativa na fila.
-- **RN34** Inativação publica evento que remove o beneficiário da fila.
-- **RN59** Admin pode anonimizar: dados pessoais substituídos, empréstimos preservados. Não permitido com empréstimo em aberto.
+- **RN34** Inativação publica evento que remove o beneficiário da fila (ver RF06).
+- **RN59** Admin pode anonimizar: dados pessoais (inclusive CPF e endereço) removidos, empréstimos preservados. Não permitido com empréstimo em aberto.
 
 ### RF03 — Equipamentos (UC08, UC11, UC12)
 - **RN09** Patrimônio gerado pelo sistema (`PT-0001`, `PT-0002`, ...) e imutável (não aceito no create/update).
@@ -74,6 +87,9 @@ Toda regra listada deve ter teste automatizado.
 - **RN12** Transições válidas: DISPONIVEL→{RESERVADO, EMPRESTADO, EM_MANUTENCAO, BAIXADO}; RESERVADO→{EMPRESTADO, DISPONIVEL}; EMPRESTADO→{DISPONIVEL, EM_MANUTENCAO}; EM_MANUTENCAO→{DISPONIVEL, BAIXADO}; BAIXADO é final. Outras → `422`. Mudanças de status ocorrem **somente pelos fluxos** (reserva, empréstimo, devolução, manutenção, baixa); não há endpoint genérico de troca de status (UC11 é atendido pelos fluxos).
 - **RN13** Baixa só por Admin, com motivo (`INSERVIVEL`, `PERDA`, `FURTO`, `DOACAO`); baixado não pode ser emprestado nem reservado. Baixa = exclusão lógica (RN03).
 - **RN14** Tipo obrigatório (`CADEIRA_DE_RODAS`, `ANDADOR`, `MULETAS`, `CADEIRA_DE_BANHO`, `OUTROS`), porte/tamanho opcional, conservação obrigatória (`BOM`, `REGULAR`, `RUIM`).
+  Os tipos ficam na tabela `tb_equipment_types` (MER `tb_equipamento_tipo`), com descrição e prazo de empréstimo
+  editáveis pelo Admin (`GET/PUT /tipos-equipamento`); a lista de tipos é fixa (enum).
+- **MER** Equipamento tem **ano** (opcional, ≥ 1900) e **especificações** livres nome/valor (opcionais, sem nomes repetidos — MER `tb_especificacao`).
 
 ### RF04 — QR Code (UC09, UC10)
 - **RN10** QR Code codifica **apenas o número de patrimônio**; é determinístico, logo a reimpressão gera o mesmo código.
@@ -82,18 +98,23 @@ Toda regra listada deve ter teste automatizado.
 ### RF05 — Empréstimos e devoluções (UC13, UC15–UC17)
 - **RN16** Nenhum campo de cobrança/taxa/caução existe no modelo; o termo declara gratuidade.
 - **RN17** Só empresta equipamento `DISPONIVEL` ou `RESERVADO` para o próprio beneficiário.
-- **RN18** Prazo padrão 30 dias, parametrizável por tipo pelo Admin; data prevista calculada pelo sistema.
+- **RN18** Prazo padrão 30 dias (`loan.default-days`), parametrizável por tipo pelo Admin (`tb_equipment_types.loan_days`); data prevista calculada pelo sistema.
 - **RN19** Máx. 1 empréstimo ativo do mesmo tipo por beneficiário e máx. 2 ativos no total (parametrizável).
 - **RN20** Beneficiário bloqueado se tiver empréstimo em atraso, termo não assinado ou ocorrência aberta.
 - **RN21** Empréstimo nasce `PENDENTE_ASSINATURA` com termo gerado; só fica `ATIVO` após registro da assinatura (física digitalizada via upload ou digital/aceite eletrônico). Termo não pode ser excluído.
 - **RN22** Data de retirada não pode ser futura; retroativa exige Admin + justificativa.
 - **RN23** Renovação: máx. 2 por empréstimo, não pode estar em atraso, não pode haver fila para o tipo, só a partir de 7 dias antes do vencimento. Nova data = vencimento atual + prazo do tipo.
+- **UC16 [rev. 24/11]** O **beneficiário** também pode renovar, sem login, por rota pública: informa CPF, data de
+  nascimento e número de patrimônio; o sistema confere que o empréstimo em aberto daquele equipamento é dele e aplica a
+  RN23. Elegível → renova (autor registrado como `BENEFICIARIO`, auditado); não elegível → `422` com o motivo. A
+  resposta traz só a nova data prevista (sem dados pessoais). Limite de tentativas por IP/CPF para evitar enumeração.
 - **RN24** Devolução exige condição. `PRECISA_MANUTENCAO` ou `DANIFICADO` → equipamento vai para `EM_MANUTENCAO` e abre manutenção corretiva automaticamente; `BOM_ESTADO` → `DISPONIVEL`.
 - **RN25** Retirada, assinatura, renovação, devolução e cancelamento gravam usuário e data/hora do sistema (não editáveis).
 - **RN26** Empréstimo nunca é excluído; só cancelado (Admin + motivo).
 - **RN27** Atraso a partir do dia seguinte ao vencimento (rotina diária). Com 30 dias de atraso → ocorrência `INADIMPLENCIA` + aviso ao Admin.
 - **RN28** Mesmo equipamento não pode ser emprestado/reservado em duas operações simultâneas (lock pessimista + `@Version`); a segunda → `409`.
-- **RN40** Devolução `DANIFICADO` gera ocorrência `DANO` vinculada ao beneficiário e ao empréstimo (bloqueia pela RN20).
+- **RN40 [rev. 24/11]** Toda devolução **com avaria** (`PRECISA_MANUTENCAO` ou `DANIFICADO`) gera ocorrência `DANO`
+  vinculada ao beneficiário e ao empréstimo de origem (bloqueia pela RN20 até ser resolvida).
 
 ### RF06 — Fila de espera (UC18–UC21)
 - **RN29** Fila por **tipo** de equipamento, FIFO por data/hora.
@@ -101,7 +122,9 @@ Toda regra listada deve ter teste automatizado.
 - **RN31** Uma posição ativa por beneficiário por tipo.
 - **RN32** Quando um equipamento fica disponível, o sistema reserva para o primeiro da fila (status `RESERVADO`), notifica e dá 48 h.
 - **RN33** Reserva expirada ou recusada: item vai ao próximo; beneficiário volta ao fim da fila; após 2 expirações/recusas consecutivas é removido.
-- **RN34** Beneficiário inativado ou bloqueado é removido da fila.
+- **RN34 [rev. 24/11]** Beneficiário inativado ou **bloqueado** é removido automaticamente da fila. "Bloqueado" é o da
+  RN20: empréstimo em atraso, **termo não assinado** ou ocorrência de dano/inadimplência em aberto. A remoção acontece
+  quando o bloqueio surge (atraso, ocorrência, empréstimo criado em `PENDENTE_ASSINATURA`) e é auditada como automática (RN52).
 
 ### RF07 — Termo em PDF (UC14)
 - **RN06/RN21/RN61** PDF com dados do assistido (ou responsável), equipamento, prazos e cláusula de gratuidade; hash SHA-256; arquivo guardado no storage e vinculado ao empréstimo, sem endpoint de exclusão.
@@ -109,7 +132,7 @@ Toda regra listada deve ter teste automatizado.
 ### RF08 — Manutenções (UC22–UC25)
 - **RN35** Em manutenção não pode ser emprestado/reservado e não conta como disponível.
 - **RN36** Abertura exige descrição do defeito, data de entrada e responsável técnico; equipamento passa a `EM_MANUTENCAO` automaticamente.
-- **RN37** Encerramento com parecer: `APTO` → `DISPONIVEL`; `INSERVIVEL` → baixa (motivo `INSERVIVEL`) — só Admin.
+- **RN37 / UC23 [rev. 24/11]** Encerramento com parecer **somente pelo Admin** (UC23): `APTO` → `DISPONIVEL`; `INSERVIVEL` → baixa (motivo `INSERVIVEL`).
 - **RN38** Custos (peça/serviço) por manutenção, acumulados no histórico do item.
 - **RN39** Revisão preventiva sinalizada com 12 meses sem manutenção ou 10 ciclos de empréstimo (parametrizável).
 - **RN41** Manutenção encerrada não é editada; correções só por lançamento de ajuste (Admin + motivo).
@@ -121,17 +144,26 @@ Toda regra listada deve ter teste automatizado.
 - **RN58** Criação, alteração e inativação gravam usuário, data/hora e valor anterior dos campos alterados.
 
 ### RF11 — Relatórios (UC28, UC29)
-- Tipos: `INVENTARIO`, `EMPRESTIMOS`, `ASSISTIDOS`, `MANUTENCOES`; formatos `PDF` e `CSV`.
+- Tipos: `INVENTARIO` (situação atual do acervo, inclusive baixados, com custo acumulado de manutenção), `EMPRESTIMOS`
+  (retiradas no período), `MANUTENCOES` (entradas no período, com peças e custos) e `ASSISTIDOS` (perfil de quem teve
+  empréstimo no período: idade/faixa etária, cidade, tipos usados); formatos `PDF` e `CSV` (Excel: UTF-8 com BOM e `;`).
 - **RN43** Perfil Consulta recebe nome/CPF/endereço/telefone mascarados.
 - **RN44** Toda exportação é auditada (quem, quando, filtros).
 - **RN45** Relatórios transacionais exigem período; padrão = últimos 30 dias.
 - **RN55** Baixados ficam fora de disponibilidade/ocupação, mas aparecem no histórico e nos custos.
 
 ### RF12 — Notificações (UC30–UC33)
-- **RN46** Avisos 7 dias antes, 1 dia antes, no dia e a cada 3 dias em atraso (sem duplicar no mesmo dia).
-- **RN47** Só nos canais autorizados; sem canal → tarefa de contato manual para o Admin.
+- **RN46** Avisos 7 dias antes, 1 dia antes, no dia e a cada 3 dias em atraso — no 1º dia de atraso e depois a cada
+  3 dias (1º, 4º, 7º…) — sem duplicar no mesmo dia. Só empréstimos efetivados (`ATIVO`/`ATRASADO`).
+- **RF12 [rev. 24/11]** Aviso de **elegível para renovação**: no aviso de 7 dias (início da janela da RN23), se o
+  empréstimo cumpre a RN23, a mensagem informa que pode ser renovado e como (UC16); se não cumpre, não menciona renovação.
+- **RN47 [rev. 24/11]** Envio **automático** pelos canais autorizados no consentimento: e-mail (SMTP), SMS e WhatsApp,
+  cada um por um adaptador da porta `NotificationSenderPort`, habilitado por configuração (e-mail: `spring.mail.*` +
+  remetente; SMS/WhatsApp: provedor **Twilio**). Sem canal autorizado, ou sem provedor configurado para o canal, o
+  aviso vira tarefa de contato manual para o Admin (com link wa.me pronto).
 - **RN48** Falha registrada; até 3 tentativas; depois vira contato manual.
-- **RN49** Resumo diário ao Admin: atrasos, reservas expiradas, manutenções abertas, preventivas vencidas.
+- **RN49** Resumo diário ao Admin: atrasos, reservas expiradas (últimas 24 h), manutenções abertas, preventivas
+  vencidas — enviado às 07:00 como notificação interna e consultável em `GET /notificacoes/resumo-diario` (só Admin).
 
 ### RF13 — Assistente (UC34–UC36), baseado em regras
 - **RN50** Só sugere (alocação fila × itens disponíveis); nunca executa.
@@ -141,16 +173,41 @@ Toda regra listada deve ter teste automatizado.
 - **RN53** Conteúdo (tutorial, dica, FAQ, onboarding) mantido pelo Admin e filtrado pelo perfil; FAQ pública disponível sem login.
 
 ### RF15 — Dashboard (UC39, UC40)
+- **RF15** Indicadores obrigatórios: **taxa de ocupação**, **itens em atraso**, **fila de espera atual** (por tipo),
+  **custos com manutenção** (no período) e **volume de empréstimos** (no período); situação atual da base, sem cache (tempo real).
 - **RN54** Taxa de ocupação = emprestados / ativos (não baixados).
 - **RN55** Baixados fora dos indicadores de disponibilidade/ocupação.
 - **RN56** Consulta vê apenas números consolidados (sem listas nominais).
 - Filtros por período e tipo de equipamento.
 
+### RNF06 / RN60 — Sincronização offline [rev. 24/11]
+- O frontend PWA guarda localmente as operações feitas sem conexão (retirada, devolução, renovação) e as envia em lote
+  ao reconectar (`POST /sincronizacao`). Cada operação traz um id gerado no dispositivo (idempotência — reenvio não
+  duplica) e a data/hora em que foi feita no dispositivo (`occurredAt`); o servidor grava também a hora de recebimento.
+- As operações são aplicadas em ordem de `occurredAt`, com as mesmas regras da operação online.
+- **Conflito** = operação recebida incompatível com um registro já existente sobre o **mesmo equipamento**: retirada
+  de item que já está emprestado, ou devolução de empréstimo já devolvido. **Prevalece a de data/hora mais antiga**
+  (a do dispositivo, quando o registro existente também veio de sincronização). A operação recebida **não é aplicada**
+  e o conflito fica pendente para conferência manual (`GET /sincronizacao/conflitos`,
+  `PATCH /sincronizacao/conflitos/{id}/resolver` — só Admin), indicando qual registro prevalece; o Admin é notificado.
+  Quando o existente é o mais antigo, nada mais precisa mudar; quando a operação offline é a mais antiga, o sistema não
+  desfaz o registro existente sozinho — o Admin corrige (cancelamento/ajuste) e registra a resolução.
+- Cada operação é aplicada na sua própria transação: uma recusa não desfaz as demais do lote. A retirada offline usa a
+  data do dispositivo como data de retirada (sem exigir Admin para a data passada; justificativa automática) e nasce
+  pendente de assinatura (RN21).
+- Operações recusadas por regra de negócio (não por conflito) voltam no resultado do lote com o motivo.
+
 ## 5. Requisitos não funcionais atendidos pelo backend
 - **RNF02** Camadas DDD/hexagonal preservadas; módulos desacoplados por eventos de aplicação.
 - **RNF03** Consultas indexadas por status/tipo/beneficiário; sem N+1 nos fluxos críticos.
 - **RNF05** Mascaramento, consentimento, anonimização, auditoria e storage de termos.
-- **RNF07** Concorrência controlada por lock pessimista + versão otimista no equipamento (RN28).
+- **RNF06** Sincronização offline com resolução de conflitos (RN60) — ver acima.
+- **RNF07** Concorrência controlada por lock pessimista + versão otimista no equipamento (RN28), reforçada por índices
+  únicos parciais no PostgreSQL (um empréstimo em aberto por equipamento, uma posição ativa na fila por beneficiário/tipo).
 
-## 6. Pendências de validação (após o MER)
-Todos os campos `(opc.)` do `plan.md`, nomes de tabelas/colunas e a migration Flyway `V1__init_schema.sql`.
+## 6. Modelo de dados
+- MER lógico: `docs/banco-de-dados/MER.json` (ajustado nesta revisão; diagrama e mapeamento em `docs/banco-de-dados/README.md`).
+- Schema físico: `V1__init_schema.sql` (PostgreSQL), aplicado pelo Flyway no perfil `prod`, com `ddl-auto: validate`.
+  Mudanças de schema entram como novas migrations (`V2__...`), nunca editando a V1.
+- Nomes físicos em inglês; ids `BIGINT` (o patrimônio `PT-0001` deriva do id).
+- `V2__frente_g_sessoes_sincronizacao.sql`: `tb_user_sessions` (RN57), `tb_sync_operations` e `tb_sync_conflicts` (RN60).

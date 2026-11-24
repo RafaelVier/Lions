@@ -10,6 +10,7 @@ import org.lions.backend.domain.exception.ConflictException;
 import org.lions.backend.domain.exception.ExternalServiceException;
 import org.lions.backend.domain.exception.ForbiddenOperationException;
 import org.lions.backend.domain.exception.ResourceNotFoundException;
+import org.lions.backend.domain.exception.TooManyRequestsException;
 import org.lions.backend.domain.exception.UnauthorizedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.beans.TypeMismatchException;
@@ -191,6 +192,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("Violação de integridade: {}", ex.getMostSpecificCause().getMessage());
         return problem(HttpStatus.CONFLICT, "Conflito",
                 "A operação viola uma restrição de integridade (registro duplicado ou referenciado).");
+    }
+
+    // ---------- 429 ----------
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyRequests(TooManyRequestsException ex) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "Muitas tentativas", ex.getMessage());
     }
 
     // ---------- 422 ----------

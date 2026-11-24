@@ -7,11 +7,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.lions.backend.application.dto.response.SystemParameterResponse;
 import org.lions.backend.application.port.CurrentUserPort;
 import org.lions.backend.application.service.audit.AuditService;
+import org.lions.backend.domain.entity.EquipmentTypeConfig;
 import org.lions.backend.domain.entity.SystemParameter;
 import org.lions.backend.domain.enums.AuditAction;
 import org.lions.backend.domain.enums.EquipmentType;
 import org.lions.backend.domain.exception.BusinessException;
 import org.lions.backend.domain.exception.ResourceNotFoundException;
+import org.lions.backend.domain.repository.EquipmentTypeConfigRepositoryPort;
 import org.lions.backend.domain.repository.SystemParameterRepositoryPort;
 
 import java.time.Clock;
@@ -38,6 +40,7 @@ class ParameterServiceTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2025-03-10T12:00:00Z"), ZoneOffset.UTC);
 
     private final Map<String, SystemParameter> store = new HashMap<>();
+    private final Map<EquipmentType, EquipmentTypeConfig> types = new HashMap<>();
     private AuditService auditService;
     private ParameterService service;
 
@@ -63,7 +66,24 @@ class ParameterServiceTest {
         auditService = mock(AuditService.class);
         CurrentUserPort currentUser = mock(CurrentUserPort.class);
         when(currentUser.username()).thenReturn("marcio");
-        service = new ParameterService(repository, auditService, currentUser, CLOCK);
+        EquipmentTypeConfigRepositoryPort typeRepository = new EquipmentTypeConfigRepositoryPort() {
+            @Override
+            public Optional<EquipmentTypeConfig> findByCode(EquipmentType code) {
+                return Optional.ofNullable(types.get(code));
+            }
+
+            @Override
+            public List<EquipmentTypeConfig> findAll() {
+                return new ArrayList<>(types.values());
+            }
+
+            @Override
+            public EquipmentTypeConfig save(EquipmentTypeConfig config) {
+                types.put(config.getCode(), config);
+                return config;
+            }
+        };
+        service = new ParameterService(repository, typeRepository, auditService, currentUser, CLOCK);
     }
 
     private void stored(String key, String value) {
@@ -91,7 +111,9 @@ class ParameterServiceTest {
     void deveUsarValorArmazenadoQuandoExiste() {
         stored(ParameterService.LOAN_MAX_RENEWALS, "3");
         stored(ParameterService.LOAN_DEFAULT_DAYS, "60");
-        stored("loan.days.MULETAS", "15");
+        types.put(EquipmentType.MULETAS, EquipmentTypeConfig.builder()
+                .code(EquipmentType.MULETAS).description("Muletas").loanDays(15).build());
+        types.put(EquipmentType.ANDADOR, EquipmentTypeConfig.defaultFor(EquipmentType.ANDADOR));
 
         assertThat(service.maxRenewals()).isEqualTo(3);
         assertThat(service.loanDays(EquipmentType.MULETAS)).isEqualTo(15);
@@ -110,13 +132,13 @@ class ParameterServiceTest {
 
         List<SystemParameterResponse> all = service.findAll();
 
-        assertThat(all).hasSize(ParameterService.DEFINITIONS.size() + EquipmentType.values().length);
+        assertThat(all).hasSize(ParameterService.DEFINITIONS.size());
         SystemParameterResponse renewals = all.stream()
                 .filter(p -> p.key().equals(ParameterService.LOAN_MAX_RENEWALS)).findFirst().orElseThrow();
         assertThat(renewals.value()).isEqualTo("4");
         assertThat(renewals.defaultValue()).isEqualTo("2");
         assertThat(renewals.customized()).isTrue();
-        assertThat(all).anyMatch(p -> p.key().equals("loan.days.CADEIRA_DE_RODAS") && p.value().equals("30"));
+        assertThat(all).noneMatch(p -> p.key().startsWith("loan.days."));
     }
 
     @Test
@@ -134,12 +156,6 @@ class ParameterServiceTest {
                 eq(AuditAction.UPDATE), any());
     }
 
-    @Test
-    void deveCriarRegistroQuandoParametroPorTipoAindaNaoArmazenado() {
-        service.update("loan.days.CADEIRA_DE_BANHO", "20");
-        assertThat(service.loanDays(EquipmentType.CADEIRA_DE_BANHO)).isEqualTo(20);
-    }
-
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "abc", "1.5", "", "9999999999"})
     void deveRejeitarQuandoValorNaoInteiroPositivo(String value) {
@@ -152,9 +168,9 @@ class ParameterServiceTest {
     void deveRetornarNaoEncontradoQuandoChaveDesconhecida() {
         assertThatThrownBy(() -> service.update("chave.inexistente", "1"))
                 .isInstanceOf(ResourceNotFoundException.class);
-        assertThatThrownBy(() -> service.update("loan.days.FOGUETE", "1"))
+        assertThatThrownBy(() -> service.update("loan.days.ANDADOR", "1"))
                 .isInstanceOf(ResourceNotFoundException.class);
-        assertThat(ParameterService.isKnownKey("loan.days.ANDADOR")).isTrue();
+        assertThat(ParameterService.isKnownKey("loan.default-days")).isTrue();
         assertThat(ParameterService.isKnownKey(null)).isFalse();
     }
 }

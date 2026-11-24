@@ -315,7 +315,7 @@ public class WaitlistService {
 
     /**
      * Reserva o equipamento (se ainda DISPONIVEL) para o primeiro da fila do tipo, ignorando {@code excludeEntryId}.
-     * Beneficiários com bloqueio que remove da fila (RN34) são removidos; termo pendente apenas pula a vez.
+     * Beneficiários bloqueados (RN20) ou inativos são removidos da fila (RN34).
      */
     private Optional<WaitlistEntry> allocate(Long equipmentId, EquipmentType type, Long excludeEntryId) {
         if (equipmentId == null) {

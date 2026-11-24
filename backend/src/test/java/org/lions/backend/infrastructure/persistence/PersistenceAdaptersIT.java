@@ -3,6 +3,8 @@ package org.lions.backend.infrastructure.persistence;
 import org.junit.jupiter.api.Test;
 import org.lions.backend.domain.entity.Beneficiary;
 import org.lions.backend.domain.entity.Equipment;
+import org.lions.backend.domain.entity.EquipmentSpecification;
+import org.lions.backend.domain.entity.EquipmentTypeConfig;
 import org.lions.backend.domain.entity.Loan;
 import org.lions.backend.domain.entity.LoanOrder;
 import org.lions.backend.domain.entity.Maintenance;
@@ -17,6 +19,7 @@ import org.lions.backend.domain.enums.NotificationChannel;
 import org.lions.backend.domain.enums.PriorityReason;
 import org.lions.backend.domain.repository.BeneficiaryRepositoryPort;
 import org.lions.backend.domain.repository.EquipmentRepositoryPort;
+import org.lions.backend.domain.repository.EquipmentTypeConfigRepositoryPort;
 import org.lions.backend.domain.repository.LoanOrderRepositoryPort;
 import org.lions.backend.domain.repository.LoanRepositoryPort;
 import org.lions.backend.domain.repository.MaintenanceRepositoryPort;
@@ -33,7 +36,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,6 +59,12 @@ class PersistenceAdaptersIT {
     private WaitlistEntryRepositoryPort waitlistRepository;
     @Autowired
     private MaintenanceRepositoryPort maintenanceRepository;
+    @Autowired
+    private EquipmentTypeConfigRepositoryPort equipmentTypeRepository;
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager em;
 
     static Equipment newEquipment(EquipmentType type) {
         return Equipment.builder().type(type).condition(EquipmentCondition.BOM).size("Adulto").build();
@@ -65,7 +73,7 @@ class PersistenceAdaptersIT {
     private Beneficiary beneficiary(String name) {
         Beneficiary b = Beneficiary.builder()
                 .fullName(name)
-                .documentNumber(UUID.randomUUID().toString().substring(0, 11))
+                .cpf(String.format("%011d", java.util.concurrent.ThreadLocalRandom.current().nextLong(100_000_000_000L)))
                 .birthDate(LocalDate.of(1960, 1, 1))
                 .phone("45999990000")
                 .city("Medianeira")
@@ -135,6 +143,69 @@ class PersistenceAdaptersIT {
     }
 
     @Test
+    void deveGravarEnderecoEmTabelaPropriaQuandoBeneficiarioSalvo() {
+        Beneficiary b = beneficiary("Endereço Teste");
+        b.setCep("85884-000");
+        b.setStreet("Rua Paraná");
+        b.setNumber("S/N");
+        b.setNeighborhood("Centro");
+        Beneficiary saved = beneficiaryRepository.save(b);
+        em.flush();
+
+        Beneficiary loaded = beneficiaryRepository.findById(saved.getId()).orElseThrow();
+        assertThat(loaded.getStreet()).isEqualTo("Rua Paraná");
+        assertThat(loaded.getNumber()).isEqualTo("S/N");
+        assertThat(loaded.getState()).isEqualTo("PR");
+        Long addressId = jdbc.queryForObject("SELECT address_id FROM tb_beneficiaries WHERE id = ?", Long.class,
+                saved.getId());
+        assertThat(addressId).isNotNull();
+
+        loaded.setCity("Foz do Iguaçu");
+        beneficiaryRepository.save(loaded);
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT address_id FROM tb_beneficiaries WHERE id = ?", Long.class,
+                saved.getId())).isEqualTo(addressId);
+        assertThat(jdbc.queryForObject("SELECT city FROM tb_addresses WHERE id = ?", String.class, addressId))
+                .isEqualTo("Foz do Iguaçu");
+
+        loaded.anonymize(NOW);
+        beneficiaryRepository.save(loaded);
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM tb_addresses WHERE id = ?", Integer.class, addressId))
+                .isZero();
+        assertThat(beneficiaryRepository.findById(saved.getId()).orElseThrow().getCity()).isNull();
+    }
+
+    @Test
+    void deveMapearAnoEEspecificacoesQuandoEquipamentoSalvo() {
+        Equipment e = newEquipment(EquipmentType.CADEIRA_DE_RODAS);
+        e.setManufactureYear(2021);
+        e.setSpecifications(new java.util.ArrayList<>(List.of(
+                new EquipmentSpecification("Largura do assento", "45 cm"),
+                new EquipmentSpecification("Peso máximo", "120 kg"))));
+        Equipment saved = equipmentRepository.saveNew(e);
+
+        Equipment loaded = equipmentRepository.findById(saved.getId()).orElseThrow();
+        assertThat(loaded.getManufactureYear()).isEqualTo(2021);
+        assertThat(loaded.getSpecifications()).containsExactly(
+                new EquipmentSpecification("Largura do assento", "45 cm"),
+                new EquipmentSpecification("Peso máximo", "120 kg"));
+
+        loaded.setSpecifications(new java.util.ArrayList<>(List.of(new EquipmentSpecification("Cor", "Azul"))));
+        equipmentRepository.save(loaded);
+        assertThat(equipmentRepository.findById(saved.getId()).orElseThrow().getSpecifications())
+                .containsExactly(new EquipmentSpecification("Cor", "Azul"));
+    }
+
+    @Test
+    void deveCadastrarTiposDeEquipamentoQuandoAplicacaoInicia() {
+        assertThat(equipmentTypeRepository.findAll()).extracting(EquipmentTypeConfig::getCode)
+                .containsExactlyInAnyOrder(EquipmentType.values());
+        assertThat(equipmentTypeRepository.findByCode(EquipmentType.ANDADOR).orElseThrow().getDescription())
+                .isEqualTo("Andador");
+    }
+
+    @Test
     void deveMapearGrafoQuandoEmprestimoSalvo() {
         Beneficiary b = beneficiary("José Grafo");
         Equipment e = equipmentRepository.saveNew(newEquipment(EquipmentType.CADEIRA_DE_BANHO));
@@ -175,7 +246,7 @@ class PersistenceAdaptersIT {
         p.setPriority(PriorityReason.URGENCIA_SAUDE, "Alta hospitalar", "admin");
         WaitlistEntry e3 = waitlistRepository.save(p);
         WaitlistEntry r = entry(reserved, type, NOW.minusDays(20));
-        r.reserve(999L, NOW, 48);
+        r.reserve(equipmentRepository.saveNew(newEquipment(type)).getId(), NOW, 48);
         waitlistRepository.save(r);
 
         List<WaitlistEntry> queue = waitlistRepository.findActiveByType(type);

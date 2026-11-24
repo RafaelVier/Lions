@@ -9,7 +9,8 @@ import java.time.LocalDate;
 
 /**
  * Devolução com vistoria (RN24/RN40). {@code returnDate} nula = hoje. {@code PRECISA_MANUTENCAO}/{@code DANIFICADO}
- * enviam o item para manutenção corretiva automática; {@code DANIFICADO} exige descrição e gera ocorrência de dano.
+ * enviam o item para manutenção corretiva automática e geram ocorrência de dano vinculada ao beneficiário (RN40);
+ * {@code DANIFICADO} exige descrição.
  */
 public record LoanReturnRequest(
         @NotNull(message = "A condição do equipamento na devolução é obrigatória.")

@@ -9,62 +9,49 @@ API REST e regras de negócio desenvolvidas para a solução **OrtoEmpresta** (B
 #### 🛠️ Tecnologias
 - **Linguagem:** Java 21 (LTS)
 - **Build:** Gradle 8.14 (Kotlin DSL) via Gradle Wrapper
-- **Framework Principal:** Spring Boot 3.3.4
-- **Segurança:** Spring Security 6 com autenticação Stateless via JWT (JJWT 0.12.6) e RBAC (Roles)
-- **Persistência de Dados:** Spring Data JPA / Hibernate
-- **Bancos de Dados:** H2 Database (desenvolvimento em memória) e PostgreSQL 16 (produção)
-- **Migrations:** Flyway
-- **Integrações Cloud:** Spring Cloud OpenFeign (consulta automática de endereço via ViaCEP)
-- **Documentação de API:** Swagger / OpenAPI 3.0 (`springdoc-openapi-starter-webmvc-ui:2.6.0`)
-- **Documentos & Jurídico:** OpenPDF (geração do Termo de Responsabilidade com hash SHA-256)
-- **Rotinas Agendadas:** Spring `@Scheduled` (verificação diária dos prazos de 90 dias)
+- **Framework:** Spring Boot 3.3.4
+- **Segurança:** Spring Security 6, JWT stateless (JJWT 0.12.6, sessão de 30 min) e perfis `ROLE_ADMIN`, `ROLE_OPERATOR` e `ROLE_VIEWER`
+- **Persistência:** Spring Data JPA / Hibernate
+- **Bancos de dados:** H2 (desenvolvimento e testes) e PostgreSQL 16 (produção)
+- **Migrations:** Flyway (`V1__init_schema.sql`, `V2__frente_g_sessoes_sincronizacao.sql`)
+- **Integrações:** ViaCEP (OpenFeign), e-mail (SMTP) e SMS/WhatsApp (Twilio), opcionais por configuração
+- **Documentação de API:** Swagger / OpenAPI 3 (`springdoc-openapi-starter-webmvc-ui:2.6.0`)
+- **Documentos:** OpenPDF (termo de responsabilidade com hash SHA-256 e relatórios) e ZXing (QR Code)
+- **Rotinas agendadas:** Spring `@Scheduled` (atrasos, preventivas, reservas da fila, lembretes, resumo diário, sessões)
 
-#### 🏛️ Arquitetura (Domain-Driven Design - DDD)
-A aplicação segue os princípios de separação de responsabilidades do DDD com arquitetura em camadas:
+#### 🏛️ Arquitetura (DDD / hexagonal)
+- **`domain`:** entidades com as regras de negócio, enums, *ports* de persistência e exceções.
+- **`application`:** casos de uso por módulo (`auth`, `user`, `beneficiary`, `order`, `equipment`, `maintenance`,
+  `loan`, `waitlist`, `notification`, `dashboard`, `report`, `help`, `assistant`, `sync`, `audit`, `parameter`),
+  eventos entre módulos, DTOs e utilitários (CPF, senha forte, mascaramento LGPD).
+- **`infrastructure`:** JPA e adapters, segurança JWT, envio de notificações, rotinas agendadas, QR Code, storage e ViaCEP.
+- **`presentation`:** controllers REST em `/api/v1` e tratamento de erros no formato *Problem Details*.
 
-- **`domain` (Núcleo de Negócio Puro):**
-  - `entity/`: Entidades ricas (`Equipment`, `Requester`, `LoanOrder`, `Loan`, `LoanReturn`, `Maintenance`, `User`).
-  - `enums/`: Tipos (`EquipmentType`, `EquipmentCondition`, `LoanStatus`, `OrderStatus`, `ReturnCondition`, etc.).
-  - `repository/`: *Ports* (interfaces abstratas de persistência desacopladas de framework).
-  - `exception/`: Exceções de negócio (`BusinessException`, `ResourceNotFoundException`, etc.).
+Descrição completa (perfis, regras, variáveis de ambiente, rotinas e rotas):
+[`docs/DESCRICAO_DO_PROJETO_E_BACKEND.md`](docs/DESCRICAO_DO_PROJETO_E_BACKEND.md). Contrato da API:
+[`docs/specs/001-alinhamento-planilha/andamento.md`](docs/specs/001-alinhamento-planilha/andamento.md) (seção 6).
 
-- **`application` (Casos de Uso & Orquestração):**
-  - `service/`: Serviços de aplicação (`EquipmentService`, `LoanOrderService`, `LoanService`, `PdfTermService`, `WhatsAppMessageHelper`).
-  - `dto/`: Objetos de transferência de dados (`request/` e `response/`) com validações Bean Validation e mascaramento de dados sensíveis (LGPD).
+#### ⚙️ Como executar o backend localmente
 
-- **`infrastructure` (Adaptadores & Detalhes Técnicos):**
-  - `persistence/`: Entidades JPA, interfaces Spring Data e *Adapters* implementando as portas do domínio.
-  - `security/`: Provedor e filtro JWT, UserDetailsService e SecurityFilterChain com endpoints públicos e protegidos.
-  - `client/`: Cliente Feign para integração com a API pública do ViaCEP.
-  - `config/`: Configuração do Swagger OpenAPI com suporte a Bearer Token.
+1. **Pré-requisitos:** Java 21 (ex.: [SDKMAN](https://sdkman.io/) `sdk install java 21.0.11-tem`). Não é preciso
+   instalar o Gradle: o projeto usa o wrapper (`gradlew`).
 
-#### ⚙️ Como Executar o Backend Localmente
-
-1. **Pré-requisitos:**
-   - Java 21 instalado (via [SDKMAN](https://sdkman.io/): `sdk install java 21.0.11-tem`)
-   - Não é necessário instalar o Gradle: o projeto usa o Gradle Wrapper (`gradlew`)
-
-2. **Entrar no diretório do backend:**
+2. **Desenvolvimento (perfil `dev`, H2 em memória):**
    ```bash
    cd backend
-   ```
-
-3. **Executar a aplicação (Perfil `dev` com banco H2 em memória):**
-   ```bash
    ./gradlew bootRun
    ```
-   No Windows: `gradlew.bat bootRun`
+   No Windows: `gradlew.bat bootRun`. Outros comandos: `./gradlew test` (testes) e `./gradlew build`.
 
-   Outros comandos úteis:
-   ```bash
-   ./gradlew build   # compila e roda os testes
-   ./gradlew test    # roda apenas os testes
-   ```
-
-4. **Acessar a documentação interativa da API:**
+3. **Acessos:**
    - **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
    - **OpenAPI JSON:** [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
-   - **Console H2 (Dev):** [http://localhost:8080/h2-console](http://localhost:8080/h2-console) (JDBC URL: `jdbc:h2:mem:lionsdb`, Usuário: `sa`, Senha em branco)
+   - **Console H2 (dev):** [http://localhost:8080/h2-console](http://localhost:8080/h2-console) (JDBC URL: `jdbc:h2:mem:lionsdb`, usuário `sa`, senha em branco)
+   - **Administrador inicial:** `marcio` / `Lions@123` (configurável por `LIONS_ADMIN_USERNAME` e `LIONS_ADMIN_PASSWORD`)
+
+4. **Produção (PostgreSQL + Flyway):** perfil `prod` (`SPRING_PROFILES_ACTIVE=prod`) com `SPRING_DATASOURCE_URL`,
+   `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `LIONS_JWT_SECRET` e `TZ=America/Sao_Paulo`.
+   Detalhes em [`backend/README.md`](backend/README.md).
 
 
 ### frontend

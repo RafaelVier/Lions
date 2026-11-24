@@ -11,6 +11,7 @@ public enum AuditAction {
     ADJUSTMENT("Ajuste"),
     LOGIN("Login"),
     LOGOUT("Logout"),
+    SESSION_EXPIRED("Sessão expirada por inatividade"),
     EXPORT("Exportação");
 
     private final String description;

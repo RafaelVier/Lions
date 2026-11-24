@@ -2,6 +2,7 @@ package org.lions.backend.application.service.equipment;
 
 import lombok.RequiredArgsConstructor;
 import org.lions.backend.application.dto.request.EquipmentCreateRequest;
+import org.lions.backend.application.dto.request.EquipmentSpecificationRequest;
 import org.lions.backend.application.dto.request.EquipmentUpdateRequest;
 import org.lions.backend.application.dto.request.WriteOffRequest;
 import org.lions.backend.application.dto.response.EquipmentHistoryResponse;
@@ -18,6 +19,7 @@ import org.lions.backend.application.service.parameter.ParameterService;
 import org.lions.backend.application.support.AuditDetails;
 import org.lions.backend.domain.entity.Beneficiary;
 import org.lions.backend.domain.entity.Equipment;
+import org.lions.backend.domain.entity.EquipmentSpecification;
 import org.lions.backend.domain.entity.Loan;
 import org.lions.backend.domain.entity.Maintenance;
 import org.lions.backend.domain.enums.AuditAction;
@@ -44,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -58,7 +61,8 @@ public class EquipmentService {
     public static final int QR_MIN_SIZE = 100;
     public static final int QR_MAX_SIZE = 1000;
     public static final int QR_DEFAULT_SIZE = 300;
-    private static final String[] EDITABLE_FIELDS = {"type", "size", "condition", "notes", "photoUrl"};
+    private static final String[] EDITABLE_FIELDS = {"type", "size", "manufactureYear", "specifications", "condition",
+            "notes", "photoUrl"};
 
     private final EquipmentRepositoryPort equipmentRepository;
     private final LoanRepositoryPort loanRepository;
@@ -77,6 +81,8 @@ public class EquipmentService {
         Equipment equipment = Equipment.builder()
                 .type(request.getType())
                 .size(blankToNull(request.getSize()))
+                .manufactureYear(request.getManufactureYear())
+                .specifications(toSpecifications(request.getSpecifications()))
                 .condition(request.getCondition())
                 .status(EquipmentStatus.DISPONIVEL)
                 .notes(blankToNull(request.getNotes()))
@@ -133,6 +139,12 @@ public class EquipmentService {
         }
         if (request.getSize() != null) {
             equipment.setSize(blankToNull(request.getSize()));
+        }
+        if (request.getManufactureYear() != null) {
+            equipment.setManufactureYear(request.getManufactureYear());
+        }
+        if (request.getSpecifications() != null) {
+            equipment.setSpecifications(toSpecifications(request.getSpecifications()));
         }
         if (request.getCondition() != null) {
             equipment.setCondition(request.getCondition());
@@ -299,5 +311,17 @@ public class EquipmentService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static List<EquipmentSpecification> toSpecifications(List<EquipmentSpecificationRequest> requests) {
+        List<EquipmentSpecification> result = new ArrayList<>();
+        if (requests != null) {
+            requests.stream()
+                    .filter(Objects::nonNull)
+                    .map(r -> new EquipmentSpecification(r.name() == null ? null : r.name().trim(),
+                            r.value() == null ? null : r.value().trim()))
+                    .forEach(result::add);
+        }
+        return result;
     }
 }

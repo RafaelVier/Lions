@@ -2,6 +2,7 @@ package org.lions.backend.infrastructure.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.lions.backend.domain.enums.EquipmentCondition;
 import org.lions.backend.domain.enums.EquipmentStatus;
 import org.lions.backend.domain.enums.EquipmentType;
@@ -12,6 +13,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "tb_equipments", indexes = {
@@ -39,8 +42,18 @@ public class EquipmentJpaEntity {
     @Column(name = "type", nullable = false, length = 40)
     private EquipmentType type;
 
-    @Column(name = "equipment_size", length = 40)
+    @Column(name = "equipment_size", length = 50)
     private String size;
+
+    @Column(name = "manufacture_year")
+    private Integer manufactureYear;
+
+    @ElementCollection
+    @CollectionTable(name = "tb_equipment_specifications", joinColumns = @JoinColumn(name = "equipment_id"))
+    @OrderColumn(name = "position")
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<EquipmentSpecificationEmbeddable> specifications = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(name = "equipment_condition", nullable = false, length = 20)

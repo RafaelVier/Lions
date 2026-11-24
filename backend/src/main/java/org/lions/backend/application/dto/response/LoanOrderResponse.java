@@ -4,10 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.lions.backend.application.support.LgpdMasker;
 import org.lions.backend.domain.entity.Beneficiary;
 import org.lions.backend.domain.entity.LoanOrder;
-import org.lions.backend.domain.enums.DocumentType;
 import org.lions.backend.domain.enums.EquipmentType;
 import org.lions.backend.domain.enums.OrderStatus;
 
@@ -21,8 +19,7 @@ public class LoanOrderResponse {
     private Long id;
     private Long beneficiaryId;
     private String beneficiaryName;
-    private DocumentType documentType;
-    private String maskedDocument;
+    private String maskedCpf;
     private String phone;
     private String city;
     private String state;
@@ -46,8 +43,7 @@ public class LoanOrderResponse {
                 .id(order.getId())
                 .beneficiaryId(b != null ? b.getId() : null)
                 .beneficiaryName(b != null ? b.getFullName() : null)
-                .documentType(b != null ? b.getDocumentType() : null)
-                .maskedDocument(b != null ? LgpdMasker.maskDocument(b.getDocumentNumber()) : null)
+                .maskedCpf(b != null ? b.getMaskedCpf() : null)
                 .phone(b != null ? b.getPhone() : null)
                 .city(b != null ? b.getCity() : null)
                 .state(b != null ? b.getState() : null)

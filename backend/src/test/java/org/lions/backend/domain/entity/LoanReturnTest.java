@@ -31,9 +31,10 @@ class LoanReturnTest {
     }
 
     @Test
-    void deveIndicarManutencaoQuandoPrecisaManutencao() {
-        assertThat(LoanReturn.register(1L, TODAY, ReturnCondition.PRECISA_MANUTENCAO, null, null, "op")
-                .needsMaintenance()).isTrue();
+    void deveIndicarManutencaoEAvariaQuandoPrecisaManutencao() {
+        LoanReturn r = LoanReturn.register(1L, TODAY, ReturnCondition.PRECISA_MANUTENCAO, null, null, "op");
+        assertThat(r.needsMaintenance()).isTrue();
+        assertThat(r.isHasDamage()).isTrue();
         assertThatThrownBy(() -> LoanReturn.register(1L, TODAY, null, null, null, "op"))
                 .isInstanceOf(BusinessException.class);
     }

@@ -34,7 +34,6 @@
 | `EquipmentStatus` | `DISPONIVEL`, `RESERVADO`, `EMPRESTADO`, `EM_MANUTENCAO`, `BAIXADO` + `boolean canTransitionTo(EquipmentStatus)` (RN12) |
 | `EquipmentCondition` | `BOM`, `REGULAR`, `RUIM` |
 | `WriteOffReason` | `INSERVIVEL`, `PERDA`, `FURTO`, `DOACAO` |
-| `DocumentType` | `CPF`, `ESTRANGEIRO`, `CNPJ` |
 | `NotificationChannel` | `WHATSAPP`, `SMS`, `EMAIL` |
 | `OrderStatus` | `PENDENTE_ANALISE`, `APROVADO`, `REJEITADO`, `EM_FILA_ESPERA`, `CANCELADO` |
 | `LoanStatus` | `PENDENTE_ASSINATURA`, `ATIVO`, `ATRASADO`, `DEVOLVIDO`, `CANCELADO` (+ `isOpen()` = PENDENTE_ASSINATURA/ATIVO/ATRASADO) |
@@ -48,41 +47,53 @@
 | `MaintenanceStatus` | `EM_ANDAMENTO`, `CONCLUIDA_APTO`, `CONCLUIDA_INSERVIVEL` |
 | `MaintenanceVerdict` | `APTO`, `INSERVIVEL` |
 | `CostType` | `PECA`, `SERVICO` |
-| `NotificationType` | `LEMBRETE_7_DIAS`, `LEMBRETE_1_DIA`, `VENCIMENTO_HOJE`, `ATRASO`, `RESERVA_DISPONIVEL`, `INADIMPLENCIA`, `RESUMO_DIARIO`, `CONTATO_MANUAL`, `PREVENTIVA_VENCIDA`, `GERAL` |
+| `NotificationType` | `LEMBRETE_7_DIAS`, `LEMBRETE_1_DIA`, `VENCIMENTO_HOJE`, `ATRASO`, `RESERVA_DISPONIVEL`, `INADIMPLENCIA`, `RESUMO_DIARIO`, `CONTATO_MANUAL`, `PREVENTIVA_VENCIDA`, `CONFLITO_SINCRONIZACAO` *(rev. 24/11)*, `GERAL` |
 | `NotificationStatus` | `PENDENTE`, `ENVIADA`, `FALHA`, `AGUARDANDO_CONTATO_MANUAL`, `CONCLUIDA_MANUALMENTE` |
 | `RecipientType` | `BENEFICIARIO`, `ADMINISTRADOR` |
-| `AuditAction` | `CREATE`, `UPDATE`, `INACTIVATE`, `REACTIVATE`, `STATUS_CHANGE`, `CANCEL`, `ANONYMIZE`, `ADJUSTMENT`, `LOGIN`, `LOGOUT`, `EXPORT` |
+| `AuditAction` | `CREATE`, `UPDATE`, `INACTIVATE`, `REACTIVATE`, `STATUS_CHANGE`, `CANCEL`, `ANONYMIZE`, `ADJUSTMENT`, `LOGIN`, `LOGOUT`, `SESSION_EXPIRED` *(rev. 24/11)*, `EXPORT` |
+| `SyncOperationType` *(rev. 24/11)* | `RETIRADA`, `DEVOLUCAO`, `RENOVACAO` |
+| `SyncConflictStatus` *(rev. 24/11)* | `PENDENTE`, `RESOLVIDO` |
+| `SessionEndReason` *(rev. 24/11)* | `LOGOUT`, `EXPIRADA`, `REVOGADA` |
 | `HelpContentType` | `TUTORIAL`, `DICA`, `FAQ`, `ONBOARDING` |
 | `HelpAudience` | `PUBLICO`, `ADMIN`, `OPERADOR`, `CONSULTA` |
 | `ReportType` | `INVENTARIO`, `EMPRESTIMOS`, `ASSISTIDOS`, `MANUTENCOES` |
 | `ReportFormat` | `PDF`, `CSV` |
 
-Removidos: `UserRole.ROLE_MANAGER/ROLE_MEMBER`, `EquipmentCondition.NOVO/SEMINOVO/USADO/EM_MANUTENCAO/BAIXADO`, `LoanStatus.RENOVADO`, `OrderStatus.PENDENTE_ESTOQUE`, `MaintenanceStatus.CONCLUIDA/IRRECUPERAVEL`.
+Removidos: `DocumentType` (rev. 24/11 — só CPF, RN04), `UserRole.ROLE_MANAGER/ROLE_MEMBER`, `EquipmentCondition.NOVO/SEMINOVO/USADO/EM_MANUTENCAO/BAIXADO`, `LoanStatus.RENOVADO`, `OrderStatus.PENDENTE_ESTOQUE`, `MaintenanceStatus.CONCLUIDA/IRRECUPERAVEL`.
 
 ## 3. Modelo de domínio (`domain.entity`) e tabelas
 
-`(opc.)` = nullable, revisar com o MER. Todas têm `id`, `createdAt`, `updatedAt` (exceto onde indicado), auditados via `@CreatedDate/@LastModifiedDate`.
+`(opc.)` = nullable. Todas têm `id`, `createdAt`, `updatedAt` (exceto onde indicado), auditados via `@CreatedDate/@LastModifiedDate`.
+Schema físico: `db/migration/V1__init_schema.sql` (PostgreSQL); MER lógico e mapeamento: `docs/banco-de-dados/` (ver §11).
 
 ### User → `tb_users`
 `username` (único), `fullName (opc.)`, `email` (único), `password` (BCrypt), `role`, `active`, `lastLoginAt (opc.)`.
 Regras: `deactivate()`, `activate()`, `changeRole(newRole, actingUsername)` → `BusinessException` se `actingUsername == username` (RN02).
 
-### Beneficiary → `tb_beneficiaries` (substitui `Requester`/`tb_requesters`)
-`fullName`, `documentType` (default CPF), `documentNumber` (só dígitos p/ CPF/CNPJ), `birthDate`, `phone`, `email (opc.)`,
-`cep`, `street`, `number`, `complement (opc.)`, `neighborhood`, `city`, `state`,
+### Beneficiary → `tb_beneficiaries` + `tb_addresses` (substitui `Requester`/`tb_requesters`)
+`fullName`, `cpf` (só dígitos; nulo só após anonimização; único entre ativos — índice parcial), `birthDate`, `phone`, `email (opc.)`,
+endereço `cep`, `street`, `number` (texto, aceita "S/N"), `complement (opc.)`, `neighborhood`, `city`, `state` — no domínio
+continuam campos do `Beneficiary`; na persistência vão para `tb_addresses` (1:1 por `address_id`, MER `tb_endereco`; o
+adapter reaproveita a linha na edição e a remove na anonimização),
 `alternativeContactName`, `alternativeContactPhone`, `alternativeContactRelationship (opc.)`,
-`legallyIncapable` (bool), `legalGuardianName (opc.)`, `legalGuardianDocument (opc.)`, `legalGuardianPhone (opc.)`, `legalGuardianRelationship (opc.)`,
+`legallyIncapable` (bool), `legalGuardianName (opc.)`, `legalGuardianCpf (opc.; obrigatório com responsável — RN06)`, `legalGuardianPhone (opc.)`, `legalGuardianEmail (opc.)`, `legalGuardianRelationship (opc.)`,
 `consentGranted`, `consentTimestamp`, `consentGivenBy (opc.)`, `notificationChannels` (`Set<NotificationChannel>`, `@ElementCollection` em `tb_beneficiary_channels`),
 `active`, `inactivatedAt (opc.)`, `inactivationReason (opc.)`, `anonymized`, `anonymizedAt (opc.)`, `notes (opc.)`.
-Regras: `validate(LocalDate today)` (RN05, RN06, RN07, CPF válido via `CpfValidator`), `isMinor(today)`, `requiresLegalGuardian(today)`, `signatoryName(today)` / `signatoryDocument(today)`, `inactivate(reason, now)`, `reactivate(now)`, `anonymize(now)`, `getMaskedDocument()`.
-Índices: `documentNumber`, `active`.
+Regras: `validate(LocalDate today)` (RN05, RN06, RN07, CPFs válidos via `CpfValidator`), `isMinor(today)`, `requiresLegalGuardian(today)`, `signatoryName(today)` / `signatoryCpf(today)`, `inactivate(reason, now)`, `reactivate(now)`, `anonymize(now)`, `getMaskedCpf()`.
+Índices: `cpf`, `active`, único parcial `cpf WHERE active`.
 
 ### LoanOrder (Solicitação) → `tb_loan_orders`
 `beneficiary` (FK), `forSelf`, `requesterName (opc.)`, `requesterRelationship (opc.)`, `equipmentType`, `needReason (opc., dado sensível)`, `status`, `rejectionReason (opc.)`, `assistedRegistration`, `decidedBy (opc.)`, `decidedAt (opc.)`.
 Regras: `approve(by, now)`, `reject(reason, by, now)`, `sendToWaitlist(by, now)`, `cancel(...)` — só a partir de `PENDENTE_ANALISE` (e `EM_FILA_ESPERA` → `APROVADO` permitido).
 
-### Equipment → `tb_equipments`
-`patrimonyNumber` (único, gerado `PT-%04d` a partir do id após o primeiro save), `type`, `size (opc.)`, `condition`, `status`, `notes (opc.)`, `photoUrl (opc.)`,
+### EquipmentTypeConfig → `tb_equipment_types` (MER `tb_equipamento_tipo`)
+`code` (PK = nome do enum `EquipmentType`), `description`, `loanDays (opc.; nulo = loan.default-days — RN18)`, `updatedBy (opc.)`, `updatedAt (opc.)`.
+Uma linha por tipo do enum: inserida pela V1 e garantida na inicialização (`EquipmentTypeInitializer`, para o H2 de dev/teste).
+`tb_equipments.type`, `tb_loan_orders.equipment_type` e `tb_waitlist_entries.equipment_type` têm FK para `code`.
+
+### Equipment → `tb_equipments` + `tb_equipment_specifications`
+`patrimonyNumber` (único, gerado `PT-%04d` a partir do id após o primeiro save), `type`, `size (opc.)`, `manufactureYear (opc., ≥ 1900 — MER ano)`,
+`specifications` (`List<EquipmentSpecification(name, value)>`, `@ElementCollection` ordenada em `tb_equipment_specifications` — MER `tb_especificacao`; nomes não se repetem), `condition`, `status`, `notes (opc.)`, `photoUrl (opc.)`,
 `reservedForBeneficiaryId (opc.)`, `writeOffReason (opc.)`, `writeOffNotes (opc.)`, `writeOffDate (opc.)`, `writeOffBy (opc.)`,
 `lastMaintenanceDate (opc.)`, `loanCyclesSinceMaintenance` (int), `version` (`@Version`, Long).
 Regras (todas validam RN12 via `EquipmentStatus.canTransitionTo`, lançando `BusinessException`):
@@ -131,13 +142,30 @@ Regras: `validateOpening()` (RN36), `addCost(...)` (só EM_ANDAMENTO, salvo ajus
 ### HelpContent → `tb_help_contents`
 `type`, `title`, `content` (TEXT), `keywords (opc.)`, `audiences` (`Set<HelpAudience>`, `@ElementCollection`), `displayOrder`, `active`.
 
+### Frente G (rev. 24/11 — migration `V2__frente_g_sessoes_sincronizacao.sql`)
+- **UserSession → `tb_user_sessions`** (RN57): `jti` (único), `username`, `issuedAt`, `expiresAt`, `endedAt (opc.)`,
+  `endReason (opc.: LOGOUT, RENOVADA, EXPIRADA, REVOGADA)`. `SessionService` substituiu o `TokenRevocationService` em
+  memória: o filtro JWT recusa token cuja sessão foi encerrada; inativar usuário revoga as sessões dele.
+- **SyncOperation → `tb_sync_operations`** (RN60): `clientOperationId` (único), `type`, `beneficiaryId/equipmentId/loanId
+  (opc.)`, `occurredAt`, `receivedAt`, `username`, `result` (APLICADA, RECUSADA, CONFLITO, DUPLICADA), `message`,
+  `resultingLoanId (opc.)`, `conflictId (opc.)`.
+- **SyncConflict → `tb_sync_conflicts`** (RN60): `equipmentId`, `existingLoanId`, `clientOperationId`, `operationType`,
+  `incomingOccurredAt`, `existingOccurredAt`, `prevailing` (EXISTENTE/RECEBIDA), `description`, `status`
+  (PENDENTE/RESOLVIDO), `username`, `resolutionNote/resolvedBy/resolvedAt (opc.)`.
+
+### 3.1 MER lógico → físico
+Tabela completa em `docs/banco-de-dados/README.md`. Resumo das diferenças intencionais: nomes físicos em inglês; ids
+`BIGINT`; autores de operação gravados como username (texto) em vez de FK para usuário; devolução em tabela própria
+(`tb_loan_returns`); custos de manutenção em tabela própria (`tb_maintenance_costs`).
+
 ## 4. Ports (`domain.repository`)
 
 Cada agregado tem `XxxRepositoryPort` com `save`, `findById`, `findAll` e as consultas abaixo (adapter + Spring Data correspondentes):
 
 - `UserRepositoryPort`: `findByUsername`, `findByEmail`, `existsByUsername`, `existsByEmail`, `findAll`, `countByRoleAndActiveTrue(UserRole)`.
-- `BeneficiaryRepositoryPort`: `findActiveByDocumentNumber`, `searchByName(String)`, `findAll(Boolean active)`, `count`.
+- `BeneficiaryRepositoryPort`: `findActiveByCpf`, `findByCpf`, `searchByName(String)`, `findAll(Boolean active)`, `count`.
 - `LoanOrderRepositoryPort`: `findByStatus`, `findByBeneficiaryId`, `countByStatus`.
+- `EquipmentTypeConfigRepositoryPort`: `findByCode`, `findAll`, `save`.
 - `EquipmentRepositoryPort`: `findByIdForUpdate` (lock pessimista), `findByPatrimonyNumber`, `findByStatus`, `findByType`, `findByTypeAndStatus`, `countByStatus`, `countByTypeAndStatus`, `countTotal`, `findAllActive`.
 - `LoanRepositoryPort`: `findByStatus`, `findByStatusIn`, `findByBeneficiaryId`, `findByEquipmentId`, `findOpenByBeneficiaryId`, `findOpenDueBetween(start,end)`, `findOpenOverdue(today)`, `findByLoanDateBetween(start,end)`, `countByStatus`, `countByLoanDateBetween`.
 - `LoanRenewalRepositoryPort`: `findByLoanId`.
@@ -157,8 +185,7 @@ Cada agregado tem `XxxRepositoryPort` com `save`, `findById`, `findAll` e as con
 
 | Chave | Default |
 |---|---|
-| `loan.default-days` | 30 |
-| `loan.days.<TIPO>` | (usa default) |
+| `loan.default-days` | 30 (prazo por tipo em `tb_equipment_types.loan_days`) |
 | `loan.max-active-per-beneficiary` | 2 |
 | `loan.max-renewals` | 2 |
 | `loan.renewal-window-days` | 7 |
@@ -245,7 +272,9 @@ Legenda de perfis: **A** = ADMIN, **O** = OPERATOR, **V** = VIEWER, **P** = púb
 ### Equipamentos, QR e manutenção (RF03, RF04, RF08)
 | Método e rota | Perfis | RN |
 |---|---|---|
-| `POST /equipamentos` | A,O | RN09, RN14; publica `EquipmentAvailableEvent` |
+| `GET /tipos-equipamento` | A,O,V | RN14, RN18 (prazo efetivo por tipo) |
+| `PUT /tipos-equipamento/{codigo}` `{description, loanDays}` | A | RN18 (`loanDays` nulo = padrão), RN58 |
+| `POST /equipamentos` | A,O | RN09, RN14; `manufactureYear`, `specifications[]`; publica `EquipmentAvailableEvent` |
 | `GET /equipamentos?status&tipo&condicao` | A,O,V | |
 | `GET /equipamentos/{id}`, `GET /equipamentos/patrimonio/{numero}` | A,O,V | |
 | `PUT /equipamentos/{id}` | A,O | RN09 (patrimônio/status não editáveis), RN58 |
@@ -256,7 +285,7 @@ Legenda de perfis: **A** = ADMIN, **O** = OPERATOR, **V** = VIEWER, **P** = púb
 | `POST /manutencoes` | A,O | RN36 |
 | `GET /manutencoes?status&equipamentoId`, `GET /manutencoes/{id}` | A,O | |
 | `POST /manutencoes/{id}/custos` | A,O (ajuste só A) | RN38, RN41 |
-| `POST /manutencoes/{id}/encerrar` `{verdict, notes}` | A,O (INSERVIVEL só A) | RN37 |
+| `POST /manutencoes/{id}/encerrar` `{verdict, notes}` | **A** *(rev. 24/11 — UC23)* | RN37 |
 | `GET /manutencoes/preventivas-pendentes` | A,O | RN39 |
 
 ### Empréstimos, termo, ocorrências e auditoria (RF05, RF07, RF10)
@@ -269,6 +298,7 @@ Legenda de perfis: **A** = ADMIN, **O** = OPERATOR, **V** = VIEWER, **P** = púb
 | `POST /emprestimos/{id}/assinatura-digital` `{signerName}` | A,O | RN06, RN21 |
 | `POST /emprestimos/{id}/assinatura-fisica` (multipart `file`, `signerName`) | A,O | RN21 |
 | `POST /emprestimos/{id}/renovacao` | A,O | RN23 |
+| `POST /emprestimos/renovacao-publica` `{cpf, birthDate, patrimonyNumber}` *(rev. 24/11)* | P | UC16, RN23 (só nova data prevista na resposta; limite de tentativas) |
 | `POST /emprestimos/{id}/devolucao` | A,O | RN24, RN40 |
 | `POST /emprestimos/{id}/cancelamento` `{motivo}` | A | RN26 |
 | `POST /emprestimos/{id}/ajustes` `{descricao, motivo}` | A | RN41 |
@@ -289,10 +319,17 @@ Legenda de perfis: **A** = ADMIN, **O** = OPERATOR, **V** = VIEWER, **P** = púb
 | `PATCH /notificacoes/{id}/concluir` | A,O | |
 | `GET /notificacoes/resumo-diario` | A | RN49 |
 
+### Sincronização offline (RNF06, RN60) *(rev. 24/11)*
+| Método e rota | Perfis | RN |
+|---|---|---|
+| `POST /sincronizacao` `[{clientOperationId, type, occurredAt, payload}]` | A,O | RN60 (resultado por operação: aplicada, recusada com motivo, conflito) |
+| `GET /sincronizacao/conflitos?status` | A,O | RN60 |
+| `PATCH /sincronizacao/conflitos/{id}/resolver` `{note}` | A | RN60 |
+
 ### Dashboard e relatórios (RF15, RF11)
 | Método e rota | Perfis | RN |
 |---|---|---|
-| `GET /dashboard?inicio&fim&tipo` | A,O,V | RN54–RN56 |
+| `GET /dashboard?inicio&fim&tipo` | A,O,V | RF15 (ocupação, atrasos, fila atual por tipo, custos de manutenção, volume de empréstimos), RN54–RN56 |
 | `GET /relatorios/{tipo}?formato&inicio&fim&tipoEquipamento` | A,O,V | RN43–RN45, RN55 |
 
 ### Ajuda e assistente (RF14, RF13)
@@ -305,19 +342,28 @@ Legenda de perfis: **A** = ADMIN, **O** = OPERATOR, **V** = VIEWER, **P** = púb
 | `GET /assistente/perguntas?q=` | P | RN51 (só FAQ PUBLICO quando anônimo) |
 
 ## 8. Rotinas agendadas (`infrastructure.scheduler`, habilitadas por `lions.scheduling.enabled`, default `true`; `false` nos testes)
+Crons configuráveis em `lions.scheduling.cron.*` e fuso em `lions.scheduling.zone` (vazio = fuso do servidor, o mesmo do
+`Clock`; em produção usar `TZ=America/Sao_Paulo`). Cada job só delega ao serviço; falhas são logadas sem derrubar o agendador.
 | Job | Cron | Dono | RN |
 |---|---|---|---|
 | `OverdueLoanJob` | `0 0 1 * * *` | D | RN27, RN20, RN34 |
-| `ReservationExpirationJob` | `0 0 * * * *` | E | RN33 |
-| `DueDateReminderJob` | `0 0 8 * * *` | E | RN46, RN47 |
-| `NotificationRetryJob` | `0 */15 * * * *` | E | RN48 |
-| `DailySummaryJob` | `0 0 7 * * *` | E | RN49 |
+| `ReservationExpirationJob` | `0 */15 * * * *` | E | RN33 |
+| `DueDateReminderJob` | `0 0 8 * * *` | E | RN46 (7 d, 1 d, no dia; atraso no 1º dia e a cada 3 d), RN47, aviso de renovação elegível (RF12) |
+| `NotificationRetryJob` | `0 5/15 * * * *` | E | RN48 |
+| `DailySummaryJob` | `0 0 7 * * *` | E | RN49 (notificação interna aos Admins, uma vez por dia) |
 | `PreventiveMaintenanceJob` | `0 30 1 * * *` | C | RN39 (notifica Admin uma vez por item/mês) |
+| `SessionExpirationJob` | `0 */5 * * * *` | A | RN57 (audita `SESSION_EXPIRED`) |
 
 ## 9. Segurança
 - JWT HS256 com `jti`; `lions.security.jwt.expiration-ms: 1800000` (30 min); segredo via `LIONS_JWT_SECRET` (default só dev).
-- `TokenRevocationService` em memória (`jti` → expiração) consultado pelo filtro.
-- Públicos: `POST /auth/login`, `POST /pedidos`, `GET /cep/**`, `GET /ajuda/publico`, `GET /assistente/perguntas`, Swagger, `/h2-console/**` (só dev), `/actuator/health`.
+- Sessões persistidas (`SessionService` + `tb_user_sessions`, RN57) consultadas pelo filtro JWT; logout, renovação e
+  inativação do usuário encerram a sessão.
+- Rota pública de renovação (UC16) com limite de tentativas por IP e por CPF (`AttemptLimiter`, padrão 5 a cada 15 min
+  → 429). Atrás de proxy reverso, configure `server.forward-headers-strategy` para o IP real chegar à aplicação.
+- Notificações (RN47): `lions.notification.mode` = `auto` (padrão) | `manual` | `simulate`; e-mail por `spring.mail.*` +
+  `lions.notification.email.from`; SMS/WhatsApp pela Twilio (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+  `TWILIO_SMS_FROM`, `TWILIO_WHATSAPP_FROM`). Canal sem provedor configurado → contato manual.
+- Públicos: `POST /auth/login`, `POST /pedidos`, `POST /emprestimos/renovacao-publica` *(rev. 24/11)*, `GET /cep/**`, `GET /ajuda/publico`, `GET /assistente/perguntas`, Swagger, `/h2-console/**` (só dev), `/actuator/health`.
 - Removidos: `/auth/register`, `GET /pedidos/{id}/termo` e `POST /pedidos/{id}/aceite-termo` públicos (expunham dados pessoais por id sequencial).
 - Admin inicial configurável: `lions.security.default-admin.username|password` (default `marcio` / `Lions@123`, senha forte).
 - CORS por `lions.cors.allowed-origins` (default `*`).
@@ -328,3 +374,12 @@ Legenda de perfis: **A** = ADMIN, **O** = OPERATOR, **V** = VIEWER, **P** = púb
 - Serviços: Mockito, `Clock` fixo.
 - API: `@SpringBootTest` + `@AutoConfigureMockMvc` + `@WithMockUser(roles=...)`, H2, `lions.scheduling.enabled=false` (`src/test/resources/application.yml` ou `@TestPropertySource`).
 - Cada RN da `spec.md` coberta por ao menos um teste; nomes `deve...Quando...`.
+
+## 11. Banco de dados
+- **PostgreSQL 14+** em produção; schema versionado pelo **Flyway** (`backend/src/main/resources/db/migration`).
+  `V1__init_schema.sql` cria todas as tabelas, FKs, CHECKs dos enums, índices (inclusive os únicos parciais das RN04,
+  RN28 e RN31) e a carga dos 5 tipos de equipamento. O admin inicial continua sendo criado pela aplicação.
+- Perfil `prod`: `spring.flyway.enabled=true` e `ddl-auto=validate` (sobrescrevíveis por `SPRING_FLYWAY_ENABLED` e
+  `SPRING_JPA_HIBERNATE_DDL_AUTO`). Perfis `dev`/teste: H2 com schema gerado pelo Hibernate.
+- Toda mudança de entidade JPA exige migration nova (`V2__descricao.sql`, ...). A V1 não é editada depois de aplicada.
+- Verificação: a suíte de testes roda também contra PostgreSQL com a V1 e `validate` (comando em `docs/banco-de-dados/README.md`).

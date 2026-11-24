@@ -81,8 +81,7 @@ public class LoanOrderService {
             if (!Boolean.TRUE.equals(request.beneficiary().consentGranted())) {
                 throw new BusinessException("É necessário o consentimento (LGPD) para registrar a solicitação.");
             }
-            beneficiary = beneficiaryService.findActiveByDocument(request.beneficiary().documentType(),
-                            request.beneficiary().documentNumber())
+            beneficiary = beneficiaryService.findActiveByCpf(request.beneficiary().cpf())
                     .orElseGet(() -> beneficiaryService.register(request.beneficiary(),
                             authenticated ? null : PUBLIC_USERNAME));
         }

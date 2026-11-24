@@ -1,5 +1,7 @@
 package org.lions.backend.infrastructure.security;
 
+import org.lions.backend.application.service.auth.SessionService;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,7 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
     private final UserDetailsService userDetailsService;
-    private final TokenRevocationService tokenRevocationService;
+    private final SessionService sessionService;
 
     @Override
     protected void doFilterInternal(
@@ -42,7 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = getJwtFromRequest(request);
         if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)
-                && !tokenRevocationService.isRevoked(tokenProvider.getJti(jwt))) {
+                && !sessionService.isRevoked(tokenProvider.getJti(jwt))) {
             authenticate(request, tokenProvider.getUsernameFromToken(jwt));
         }
         filterChain.doFilter(request, response);

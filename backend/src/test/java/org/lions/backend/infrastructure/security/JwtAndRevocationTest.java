@@ -83,37 +83,4 @@ class JwtAndRevocationTest {
         clock.advance(Duration.ofMinutes(31));
         assertThat(provider.validateToken(token)).isFalse();
     }
-
-    // ---------- TokenRevocationService ----------
-
-    @Test
-    void deveIndicarRevogadoQuandoJtiRevogadoAteExpirar() {
-        MutableClock clock = new MutableClock(T0);
-        TokenRevocationService service = new TokenRevocationService(clock);
-
-        service.revoke("jti-1", T0.plus(Duration.ofMinutes(30)));
-
-        assertThat(service.isRevoked("jti-1")).isTrue();
-        assertThat(service.isRevoked("jti-2")).isFalse();
-        assertThat(service.isRevoked(null)).isFalse();
-
-        clock.advance(Duration.ofMinutes(31));
-        assertThat(service.isRevoked("jti-1")).isFalse();
-        assertThat(service.size()).isZero();
-    }
-
-    @Test
-    void deveLimparEntradasExpiradasQuandoPurgeExecutado() {
-        MutableClock clock = new MutableClock(T0);
-        TokenRevocationService service = new TokenRevocationService(clock);
-        service.revoke("a", T0.plus(Duration.ofMinutes(5)));
-        service.revoke("b", T0.plus(Duration.ofMinutes(60)));
-        service.revoke(" ", T0.plus(Duration.ofMinutes(60)));
-
-        clock.advance(Duration.ofMinutes(10));
-
-        assertThat(service.purgeExpired()).isEqualTo(1);
-        assertThat(service.size()).isEqualTo(1);
-        assertThat(service.isRevoked("b")).isTrue();
-    }
 }

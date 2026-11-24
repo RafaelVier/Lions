@@ -46,11 +46,15 @@ public class WhatsAppMessageHelper {
         return link + "?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
+    /**
+     * Lembrete de vencimento (RN46: 7 dias e 1 dia antes). {@code renewable} = o empréstimo cumpre a RN23 hoje: a
+     * mensagem informa que pode ser renovado (RF12); caso contrário não menciona renovação.
+     */
     public String dueDateReminderMessage(String beneficiaryName, String equipmentDescription,
-                                         String patrimonyNumber, LocalDate dueDate) {
+                                         String patrimonyNumber, LocalDate dueDate, boolean renewable) {
         return "Olá, " + beneficiaryName + "! Lembramos que o prazo de devolução do equipamento "
                 + equipment(equipmentDescription, patrimonyNumber) + " vence em " + DATE.format(dueDate) + "."
-                + " Caso ainda precise dele, entre em contato para avaliarmos a renovação." + SIGNATURE;
+                + closing(renewable) + SIGNATURE;
     }
 
     public String overdueMessage(String beneficiaryName, String equipmentDescription,
@@ -67,11 +71,19 @@ public class WhatsAppMessageHelper {
                 + " Entre em contato para combinar a retirada." + SIGNATURE;
     }
 
+    /** Aviso no dia do vencimento (RN46); {@code renewable} como em {@link #dueDateReminderMessage}. */
     public String dueTodayMessage(String beneficiaryName, String equipmentDescription,
-                                  String patrimonyNumber, LocalDate dueDate) {
+                                  String patrimonyNumber, LocalDate dueDate, boolean renewable) {
         return "Olá, " + beneficiaryName + "! O prazo de devolução do equipamento "
                 + equipment(equipmentDescription, patrimonyNumber) + " vence hoje (" + DATE.format(dueDate) + ")."
-                + " Caso ainda precise dele, entre em contato para avaliarmos a renovação." + SIGNATURE;
+                + closing(renewable) + SIGNATURE;
+    }
+
+    private static String closing(boolean renewable) {
+        return renewable
+                ? " Se ainda precisar dele, o empréstimo pode ser renovado: entre em contato com o banco ortopédico"
+                + " até a data do vencimento."
+                : " Por favor, programe a devolução até essa data ou entre em contato se tiver alguma dificuldade.";
     }
 
     public String loanRegisteredMessage(String beneficiaryName, String equipmentDescription,

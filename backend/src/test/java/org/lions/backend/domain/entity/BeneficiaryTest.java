@@ -1,7 +1,6 @@
 package org.lions.backend.domain.entity;
 
 import org.junit.jupiter.api.Test;
-import org.lions.backend.domain.enums.DocumentType;
 import org.lions.backend.domain.enums.NotificationChannel;
 import org.lions.backend.domain.exception.BusinessException;
 
@@ -21,7 +20,7 @@ class BeneficiaryTest {
         Beneficiary b = Beneficiary.builder()
                 .id(12L)
                 .fullName("Maria Aparecida da Silva")
-                .documentNumber("529.982.247-25")
+                .cpf("529.982.247-25")
                 .birthDate(LocalDate.of(1950, 5, 20))
                 .phone("45999998888")
                 .cep("85884-000")
@@ -41,8 +40,7 @@ class BeneficiaryTest {
     void deveAceitarCadastroQuandoCompletoENormalizarCpf() {
         Beneficiary b = valid();
         b.validate(TODAY);
-        assertThat(b.getDocumentNumber()).isEqualTo("52998224725");
-        assertThat(b.getDocumentType()).isEqualTo(DocumentType.CPF);
+        assertThat(b.getCpf()).isEqualTo("52998224725");
         assertThat(b.isActive()).isTrue();
     }
 
@@ -62,19 +60,30 @@ class BeneficiaryTest {
     @Test
     void deveRejeitarQuandoCpfInvalido() {
         Beneficiary b = valid();
-        b.setDocumentNumber("123.456.789-00");
+        b.setCpf("123.456.789-00");
         assertThatThrownBy(() -> b.validate(TODAY))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("CPF inválido");
     }
 
     @Test
-    void deveAceitarDocumentoEstrangeiroSemValidarCpf() {
+    void deveExigirCpfQuandoAusente() {
         Beneficiary b = valid();
-        b.setDocumentType(DocumentType.ESTRANGEIRO);
-        b.setDocumentNumber("RNE-V123456");
-        b.validate(TODAY);
-        assertThat(b.getDocumentNumber()).isEqualTo("RNE-V123456");
+        b.setCpf(null);
+        assertThatThrownBy(() -> b.validate(TODAY))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CPF");
+    }
+
+    @Test
+    void deveRejeitarQuandoCpfDoResponsavelInvalido() {
+        Beneficiary b = valid();
+        b.setBirthDate(TODAY.minusYears(10));
+        b.setLegalGuardianName("Ana Souza");
+        b.setLegalGuardianCpf("111.444.777-00");
+        assertThatThrownBy(() -> b.validate(TODAY))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CPF do responsável legal inválido");
     }
 
     @Test
@@ -94,10 +103,10 @@ class BeneficiaryTest {
                 .hasMessageContaining("responsável legal");
 
         b.setLegalGuardianName("Ana Souza");
-        b.setLegalGuardianDocument("11144477735");
+        b.setLegalGuardianCpf("111.444.777-35");
         b.validate(TODAY);
         assertThat(b.signatoryName(TODAY)).isEqualTo("Ana Souza");
-        assertThat(b.signatoryDocument(TODAY)).isEqualTo("11144477735");
+        assertThat(b.signatoryCpf(TODAY)).isEqualTo("11144477735");
     }
 
     @Test
@@ -141,7 +150,7 @@ class BeneficiaryTest {
     void deveMascararDocumentoQuandoExibido() {
         Beneficiary b = valid();
         b.validate(TODAY);
-        assertThat(b.getMaskedDocument()).isEqualTo("***.982.247-**");
+        assertThat(b.getMaskedCpf()).isEqualTo("***.982.247-**");
     }
 
     @Test
@@ -165,7 +174,7 @@ class BeneficiaryTest {
         assertThat(b.isAnonymized()).isTrue();
         assertThat(b.isActive()).isFalse();
         assertThat(b.getFullName()).isEqualTo("Beneficiário anonimizado 12");
-        assertThat(b.getDocumentNumber()).isEqualTo("ANON-12");
+        assertThat(b.getCpf()).isNull();
         assertThat(b.getPhone()).isNull();
         assertThat(b.getStreet()).isNull();
         assertThat(b.getBirthDate()).isNull();

@@ -1,5 +1,11 @@
 package org.lions.backend.application.service.loan;
 
+import org.lions.backend.application.support.CpfValidator;
+
+import org.lions.backend.application.dto.response.PublicRenewalResponse;
+
+import org.lions.backend.application.dto.request.PublicRenewalRequest;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +45,6 @@ import org.lions.backend.domain.enums.LoanStatus;
 import org.lions.backend.domain.enums.OccurrenceStatus;
 import org.lions.backend.domain.enums.OccurrenceType;
 import org.lions.backend.domain.enums.OrderStatus;
-import org.lions.backend.domain.enums.ReturnCondition;
 import org.lions.backend.domain.enums.SignatureType;
 import org.lions.backend.domain.enums.UserRole;
 import org.lions.backend.domain.exception.BusinessException;
@@ -80,6 +85,8 @@ public class LoanService {
     public static final String ENTITY_NAME = "Loan";
     public static final String EQUIPMENT_ENTITY = "Equipment";
     public static final String TERMS_FOLDER = "termos";
+    /** Autor das renovações feitas pelo próprio beneficiário na rota pública (UC16). */
+    public static final String BENEFICIARY_AUTHOR = "BENEFICIARIO";
     public static final String SIGNED_TERMS_FOLDER = "termos/assinados";
     public static final long MAX_SIGNED_FILE_BYTES = 10L * 1024 * 1024;
     private static final Map<String, String> SIGNED_FILE_TYPES = Map.of(
@@ -120,6 +127,25 @@ public class LoanService {
      */
     @Transactional
     public LoanResponse registerLoan(LoanCreateRequest req) {
+        return registerLoan(req, false);
+    }
+
+    /**
+     * RN60 — retirada registrada sem conexão e sincronizada depois: a data de retirada é a do dispositivo (pode ser
+     * anterior a hoje sem exigir Admin; a justificativa de retroativo é preenchida automaticamente).
+     */
+    @Transactional
+    public LoanResponse registerOfflineLoan(LoanCreateRequest req, LocalDateTime occurredAt) {
+        req.setLoanDate(occurredAt.toLocalDate());
+        if (occurredAt.toLocalDate().isBefore(LocalDate.now(clock))
+                && (req.getRetroactiveJustification() == null || req.getRetroactiveJustification().isBlank())) {
+            req.setRetroactiveJustification("Retirada registrada offline em " + occurredAt
+                    + " e sincronizada (RN60).");
+        }
+        return registerLoan(req, true);
+    }
+
+    private LoanResponse registerLoan(LoanCreateRequest req, boolean offline) {
         LocalDate today = LocalDate.now(clock);
         LocalDateTime now = LocalDateTime.now(clock);
         String username = currentUser.username();
@@ -136,7 +162,7 @@ public class LoanService {
         if (loanDate.isAfter(today)) {
             throw new BusinessException("A data de retirada não pode ser futura.");
         }
-        if (loanDate.isBefore(today) && !currentUser.hasRole(UserRole.ROLE_ADMIN)) {
+        if (loanDate.isBefore(today) && !offline && !currentUser.hasRole(UserRole.ROLE_ADMIN)) {
             throw new ForbiddenOperationException("Empréstimo retroativo só pode ser registrado por Administrador.");
         }
 
@@ -201,6 +227,9 @@ public class LoanService {
         saved = loanRepository.save(saved);
 
         waitlistService.markServed(beneficiary.getId(), loanedEquipment.getId(), loanedEquipment.getType());
+        // RN34/RN20 — com o termo pendente de assinatura o beneficiário fica bloqueado: sai das demais filas
+        events.publishEvent(new BeneficiaryRestrictedEvent(beneficiary.getId(),
+                "Termo de empréstimo pendente de assinatura."));
 
         auditService.record(ENTITY_NAME, saved.getId(), AuditAction.CREATE, AuditDetails.of(
                 "beneficiaryId", beneficiary.getId(),
@@ -323,20 +352,49 @@ public class LoanService {
 
     @Transactional
     public LoanResponse renew(Long id) {
-        Loan loan = find(id);
+        return detail(applyRenewal(find(id), currentUser.username()));
+    }
+
+    /**
+     * UC16 — renovação pelo próprio beneficiário, sem login. Confere CPF + data de nascimento + patrimônio contra um
+     * empréstimo em aberto; qualquer divergência devolve a mesma mensagem genérica (não revela se o CPF existe).
+     * Autor registrado como {@value #BENEFICIARY_AUTHOR} (RN25).
+     */
+    @Transactional
+    public PublicRenewalResponse renewByBeneficiary(PublicRenewalRequest request) {
+        String cpf = CpfValidator.normalize(request.cpf());
+        String patrimony = request.patrimonyNumber().trim().toUpperCase(java.util.Locale.ROOT);
+        Loan loan = beneficiaryRepository.findActiveByCpf(cpf)
+                .filter(b -> request.birthDate().equals(b.getBirthDate()))
+                .flatMap(b -> equipmentRepository.findByPatrimonyNumber(patrimony)
+                        .flatMap(e -> loanRepository.findByEquipmentId(e.getId()).stream()
+                                .filter(Loan::isOpen)
+                                .filter(l -> Objects.equals(l.getBeneficiary().getId(), b.getId()))
+                                .findFirst()))
+                .orElseThrow(() -> new BusinessException(
+                        "Os dados informados não conferem com nenhum empréstimo em aberto."));
+        LocalDate previousDue = loan.getExpectedReturnDate();
+        Loan saved = applyRenewal(loan, BENEFICIARY_AUTHOR);
+        return new PublicRenewalResponse(saved.getEquipment().getPatrimonyNumber(),
+                saved.getEquipment().getType().getDescription(), previousDue, saved.getExpectedReturnDate(),
+                saved.getRenewalCount(), parameterService.maxRenewals());
+    }
+
+    /** RN23 — aplica a renovação (regras no domínio), grava o registro imutável e audita com o autor informado. */
+    private Loan applyRenewal(Loan loan, String author) {
         LocalDate today = LocalDate.now(clock);
         EquipmentType type = loan.getEquipment().getType();
         LocalDate previousDue = loan.getExpectedReturnDate();
         int previousCount = loan.getRenewalCount();
         LocalDate newDue = previousDue.plusDays(parameterService.loanDays(type));
         LoanRenewal renewal = loan.renew(newDue, today, renewalPolicy(), waitlistService.hasWaitingFor(type),
-                currentUser.username(), LocalDateTime.now(clock));
+                author, LocalDateTime.now(clock));
         Loan saved = loanRepository.save(loan);
         renewalRepository.save(renewal);
-        auditService.record(ENTITY_NAME, id, AuditAction.UPDATE, AuditDetails.of(
+        auditService.recordAs(author, ENTITY_NAME, saved.getId(), AuditAction.UPDATE, AuditDetails.of(
                 "expectedReturnDate", AuditDetails.oldNew(previousDue, saved.getExpectedReturnDate()),
                 "renewalCount", AuditDetails.oldNew(previousCount, saved.getRenewalCount())));
-        return detail(saved);
+        return saved;
     }
 
     // ---------- devolução (RN24, RN40) ----------
@@ -383,19 +441,24 @@ public class LoanService {
                         "loanId", id));
 
         Long beneficiaryId = loan.getBeneficiary().getId();
-        if (request.returnCondition() == ReturnCondition.DANIFICADO) {
+        if (loanReturn.isHasDamage()) {
+            // RN40 — toda avaria (PRECISA_MANUTENCAO ou DANIFICADO) gera ocorrência vinculada; bloqueia pela RN20
+            String damage = loanReturn.getDamageDescription() != null
+                    ? loanReturn.getDamageDescription()
+                    : "condição " + request.returnCondition().getDescription() + ", sem descrição";
             Occurrence occurrence = occurrenceRepository.save(Occurrence.builder()
                     .beneficiary(loan.getBeneficiary())
                     .loanId(id)
                     .type(OccurrenceType.DANO)
                     .status(OccurrenceStatus.ABERTA)
                     .description("Avaria na devolução do equipamento " + returnedEquipment.getPatrimonyNumber()
-                            + ": " + loanReturn.getDamageDescription())
+                            + ": " + damage)
                     .automatic(true)
                     .createdBy(username)
                     .build());
             auditService.recordAutomatic("Occurrence", occurrence.getId(), AuditAction.CREATE, "RN40",
-                    AuditDetails.of("type", OccurrenceType.DANO, "loanId", id, "beneficiaryId", beneficiaryId));
+                    AuditDetails.of("type", OccurrenceType.DANO, "loanId", id, "beneficiaryId", beneficiaryId,
+                            "returnCondition", request.returnCondition()));
             events.publishEvent(new BeneficiaryRestrictedEvent(beneficiaryId,
                     "Ocorrência de dano registrada na devolução."));
         }
@@ -472,11 +535,13 @@ public class LoanService {
         String description = equipment != null && equipment.getType() != null
                 ? equipment.getType().getDescription() : "ortopédico";
         String patrimony = equipment != null ? equipment.getPatrimonyNumber() : null;
+        boolean renewable = equipment != null && equipment.getType() != null
+                && loan.canRenew(today, renewalPolicy(), waitlistService.hasWaitingFor(equipment.getType()));
         String message = loan.isOverdue(today)
                 ? whatsApp.overdueMessage(beneficiary.getFullName(), description, patrimony,
                 loan.getExpectedReturnDate())
                 : whatsApp.dueDateReminderMessage(beneficiary.getFullName(), description, patrimony,
-                loan.getExpectedReturnDate());
+                loan.getExpectedReturnDate(), renewable);
         try {
             return whatsApp.buildLink(beneficiary.getPhone(), message);
         } catch (IllegalArgumentException e) {

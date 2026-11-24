@@ -61,7 +61,7 @@ public class PdfTermService {
 
             Beneficiary beneficiary = loan.getBeneficiary();
             String signatoryName = beneficiary.signatoryName(today);
-            String signatoryDocument = beneficiary.signatoryDocument(today);
+            String signatoryDocument = beneficiary.signatoryCpf(today);
             String equipment = loan.getEquipment().getType().getDescription();
             String patrimony = loan.getEquipment().getPatrimonyNumber();
             String condition = loan.getInitialCondition() != null

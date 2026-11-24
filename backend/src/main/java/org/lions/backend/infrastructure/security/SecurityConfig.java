@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers(antMatcher(HttpMethod.OPTIONS, "/**")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.POST, API + "/auth/login")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.POST, API + "/pedidos")).permitAll()
+                        .requestMatchers(antMatcher(HttpMethod.POST, API + "/emprestimos/renovacao-publica")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.GET, API + "/cep/**")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.GET, API + "/ajuda/publico")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.GET, API + "/assistente/perguntas")).permitAll()

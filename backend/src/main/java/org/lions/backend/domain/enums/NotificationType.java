@@ -10,6 +10,7 @@ public enum NotificationType {
     RESUMO_DIARIO("Resumo diário"),
     CONTATO_MANUAL("Contato manual"),
     PREVENTIVA_VENCIDA("Manutenção preventiva vencida"),
+    CONFLITO_SINCRONIZACAO("Conflito de sincronização offline"),
     GERAL("Geral");
 
     private final String description;

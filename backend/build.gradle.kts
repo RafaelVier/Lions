@@ -44,6 +44,9 @@ dependencies {
     // Spring Boot Validation
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
+    // E-mail (RN47 — envio de notificações por e-mail via SMTP)
+    implementation("org.springframework.boot:spring-boot-starter-mail")
+
     // Spring Data JPA
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 

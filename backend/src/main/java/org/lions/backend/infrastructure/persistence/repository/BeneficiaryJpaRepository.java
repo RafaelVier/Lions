@@ -13,12 +13,12 @@ import java.util.Optional;
 public interface BeneficiaryJpaRepository extends JpaRepository<BeneficiaryJpaEntity, Long> {
     List<BeneficiaryJpaEntity> findByActive(boolean active);
 
-    Optional<BeneficiaryJpaEntity> findFirstByDocumentNumberAndActiveTrue(String documentNumber);
+    Optional<BeneficiaryJpaEntity> findFirstByCpfAndActiveTrue(String cpf);
 
     @Query("SELECT b FROM BeneficiaryJpaEntity b WHERE LOWER(b.fullName) LIKE LOWER(CONCAT('%', :name, '%')) ORDER BY b.fullName")
     List<BeneficiaryJpaEntity> searchByName(@Param("name") String name);
 
-    List<BeneficiaryJpaEntity> findByDocumentNumberOrderByIdDesc(String documentNumber);
+    List<BeneficiaryJpaEntity> findByCpfOrderByIdDesc(String cpf);
 
     long countByActive(boolean active);
 }

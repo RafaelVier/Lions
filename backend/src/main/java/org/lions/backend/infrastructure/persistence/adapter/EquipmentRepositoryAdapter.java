@@ -2,15 +2,18 @@ package org.lions.backend.infrastructure.persistence.adapter;
 
 import lombok.RequiredArgsConstructor;
 import org.lions.backend.domain.entity.Equipment;
+import org.lions.backend.domain.entity.EquipmentSpecification;
 import org.lions.backend.domain.enums.EquipmentStatus;
 import org.lions.backend.domain.enums.EquipmentType;
 import org.lions.backend.domain.repository.EquipmentRepositoryPort;
 import org.lions.backend.infrastructure.persistence.entity.EquipmentJpaEntity;
+import org.lions.backend.infrastructure.persistence.entity.EquipmentSpecificationEmbeddable;
 import org.lions.backend.infrastructure.persistence.repository.EquipmentJpaRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -121,6 +124,11 @@ public class EquipmentRepositoryAdapter implements EquipmentRepositoryPort {
                 .patrimonyNumber(domain.getPatrimonyNumber())
                 .type(domain.getType())
                 .size(domain.getSize())
+                .manufactureYear(domain.getManufactureYear())
+                .specifications(domain.getSpecifications() == null ? new ArrayList<>()
+                        : domain.getSpecifications().stream()
+                        .map(spec -> new EquipmentSpecificationEmbeddable(spec.name(), spec.value()))
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new)))
                 .condition(domain.getCondition())
                 .status(domain.getStatus())
                 .notes(domain.getNotes())
@@ -145,6 +153,11 @@ public class EquipmentRepositoryAdapter implements EquipmentRepositoryPort {
                 .patrimonyNumber(entity.getPatrimonyNumber())
                 .type(entity.getType())
                 .size(entity.getSize())
+                .manufactureYear(entity.getManufactureYear())
+                .specifications(entity.getSpecifications() == null ? new ArrayList<>()
+                        : entity.getSpecifications().stream()
+                        .map(spec -> new EquipmentSpecification(spec.getName(), spec.getValue()))
+                        .collect(java.util.stream.Collectors.toCollection(ArrayList::new)))
                 .condition(entity.getCondition())
                 .status(entity.getStatus())
                 .notes(entity.getNotes())

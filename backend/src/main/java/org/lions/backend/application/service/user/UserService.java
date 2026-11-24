@@ -8,6 +8,7 @@ import org.lions.backend.application.dto.request.UserUpdateRequest;
 import org.lions.backend.application.dto.response.UserResponse;
 import org.lions.backend.application.port.CurrentUserPort;
 import org.lions.backend.application.service.audit.AuditService;
+import org.lions.backend.application.service.auth.SessionService;
 import org.lions.backend.application.support.AuditDetails;
 import org.lions.backend.application.support.PasswordPolicy;
 import org.lions.backend.domain.entity.User;
@@ -39,6 +40,7 @@ public class UserService {
     private final UserRepositoryPort userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final SessionService sessionService;
     private final CurrentUserPort currentUser;
 
     @Transactional(readOnly = true)
@@ -131,8 +133,9 @@ public class UserService {
         }
         user.deactivate();
         User saved = userRepository.save(user);
+        int revoked = sessionService.revokeAll(saved.getUsername());
         auditService.record(ENTITY_NAME, id, AuditAction.INACTIVATE, AuditDetails.of(
-                "active", AuditDetails.oldNew(true, false)));
+                "active", AuditDetails.oldNew(true, false), "sessionsRevoked", revoked));
         return UserResponse.from(saved);
     }
 

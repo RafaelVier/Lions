@@ -25,7 +25,10 @@ public class LoanReturn {
     private final String receivedBy;
     private final LocalDateTime createdAt;
 
-    /** Cria a devolução validando a RN24 (condição obrigatória; avaria exige descrição). */
+    /**
+     * Cria a devolução validando a RN24 (condição obrigatória; DANIFICADO exige descrição). Há avaria (RN40) em
+     * qualquer condição diferente de BOM_ESTADO.
+     */
     public static LoanReturn register(Long loanId, LocalDate returnDate, ReturnCondition condition,
                                       String damageDescription, String returnPhotoUrl, String receivedBy) {
         if (loanId == null) {
@@ -37,8 +40,8 @@ public class LoanReturn {
         if (condition == null) {
             throw new BusinessException("Condição do equipamento na devolução é obrigatória.");
         }
-        boolean damaged = condition == ReturnCondition.DANIFICADO;
-        if (damaged && (damageDescription == null || damageDescription.isBlank())) {
+        boolean damaged = condition != ReturnCondition.BOM_ESTADO;
+        if (condition == ReturnCondition.DANIFICADO && (damageDescription == null || damageDescription.isBlank())) {
             throw new BusinessException("Devolução com dano exige a descrição da avaria.");
         }
         return LoanReturn.builder()

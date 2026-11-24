@@ -1,7 +1,6 @@
 package org.lions.backend.application.dto.response;
 
 import org.lions.backend.domain.entity.Beneficiary;
-import org.lions.backend.domain.enums.DocumentType;
 import org.lions.backend.domain.enums.NotificationChannel;
 
 import java.time.LocalDate;
@@ -12,9 +11,8 @@ import java.util.Set;
 public record BeneficiaryResponse(
         Long id,
         String fullName,
-        DocumentType documentType,
-        String documentNumber,
-        String maskedDocument,
+        String cpf,
+        String maskedCpf,
         LocalDate birthDate,
         Integer age,
         boolean minor,
@@ -33,8 +31,9 @@ public record BeneficiaryResponse(
         String alternativeContactRelationship,
         boolean legallyIncapable,
         String legalGuardianName,
-        String legalGuardianDocument,
+        String legalGuardianCpf,
         String legalGuardianPhone,
+        String legalGuardianEmail,
         String legalGuardianRelationship,
         boolean consentGranted,
         LocalDateTime consentTimestamp,
@@ -54,13 +53,13 @@ public record BeneficiaryResponse(
                 ? java.time.Period.between(b.getBirthDate(), today).getYears()
                 : null;
         return new BeneficiaryResponse(
-                b.getId(), b.getFullName(), b.getDocumentType(), b.getDocumentNumber(), b.getMaskedDocument(),
+                b.getId(), b.getFullName(), b.getCpf(), b.getMaskedCpf(),
                 b.getBirthDate(), age, b.isMinor(today), !b.isAnonymized() && b.requiresLegalGuardian(today),
                 b.getPhone(), b.getEmail(), b.getCep(), b.getStreet(), b.getNumber(), b.getComplement(),
                 b.getNeighborhood(), b.getCity(), b.getState(),
                 b.getAlternativeContactName(), b.getAlternativeContactPhone(), b.getAlternativeContactRelationship(),
-                b.isLegallyIncapable(), b.getLegalGuardianName(), b.getLegalGuardianDocument(),
-                b.getLegalGuardianPhone(), b.getLegalGuardianRelationship(),
+                b.isLegallyIncapable(), b.getLegalGuardianName(), b.getLegalGuardianCpf(),
+                b.getLegalGuardianPhone(), b.getLegalGuardianEmail(), b.getLegalGuardianRelationship(),
                 b.isConsentGranted(), b.getConsentTimestamp(), b.getConsentGivenBy(), b.getNotificationChannels(),
                 b.isActive(), b.getInactivatedAt(), b.getInactivationReason(), b.isAnonymized(), b.getAnonymizedAt(),
                 b.getNotes(), b.getCreatedAt(), b.getUpdatedAt());

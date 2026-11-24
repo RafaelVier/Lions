@@ -16,13 +16,13 @@ public interface BeneficiaryRepositoryPort {
     List<Beneficiary> findAll(Boolean active);
 
     /** RN04 — beneficiário ativo com o documento (comparação exata; normalize antes). */
-    Optional<Beneficiary> findActiveByDocumentNumber(String documentNumber);
+    Optional<Beneficiary> findActiveByCpf(String cpf);
 
     /** Busca por parte do nome (case-insensitive). */
     List<Beneficiary> searchByName(String name);
 
     /** Todos (ativos ou não) com o documento (comparação exata; normalize antes). */
-    List<Beneficiary> findByDocumentNumber(String documentNumber);
+    List<Beneficiary> findByCpf(String cpf);
 
     long count();
 

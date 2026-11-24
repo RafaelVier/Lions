@@ -173,4 +173,24 @@ class EquipmentTest {
         assertThatThrownBy(() -> e.reserveFor(1L)).isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> e.markAsLoaned(1L)).isInstanceOf(BusinessException.class);
     }
+
+    @Test
+    void deveRejeitarQuandoEspecificacaoRepetidaOuIncompleta() {
+        Equipment e = equipment(EquipmentStatus.DISPONIVEL);
+        e.setSpecifications(new java.util.ArrayList<>(java.util.List.of(
+                new EquipmentSpecification("Cor", "Azul"), new EquipmentSpecification(" cor ", "Preta"))));
+        assertThatThrownBy(e::validate).isInstanceOf(BusinessException.class).hasMessageContaining("repetida");
+
+        e.setSpecifications(new java.util.ArrayList<>(java.util.List.of(new EquipmentSpecification("Cor", " "))));
+        assertThatThrownBy(e::validate).isInstanceOf(BusinessException.class).hasMessageContaining("nome e valor");
+    }
+
+    @Test
+    void deveRejeitarQuandoAnoInvalido() {
+        Equipment e = equipment(EquipmentStatus.DISPONIVEL);
+        e.setManufactureYear(1800);
+        assertThatThrownBy(e::validate).isInstanceOf(BusinessException.class);
+        e.setManufactureYear(2020);
+        e.validate();
+    }
 }

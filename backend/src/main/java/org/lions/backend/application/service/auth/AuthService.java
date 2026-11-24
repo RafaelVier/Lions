@@ -11,11 +11,11 @@ import org.lions.backend.application.support.AuditDetails;
 import org.lions.backend.application.support.PasswordPolicy;
 import org.lions.backend.domain.entity.User;
 import org.lions.backend.domain.enums.AuditAction;
+import org.lions.backend.domain.enums.SessionEndReason;
 import org.lions.backend.domain.exception.BusinessException;
 import org.lions.backend.domain.exception.UnauthorizedException;
 import org.lions.backend.domain.repository.UserRepositoryPort;
 import org.lions.backend.infrastructure.security.JwtTokenProvider;
-import org.lions.backend.infrastructure.security.TokenRevocationService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -29,8 +29,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Sessão (RN57): login (auditado, registra último acesso), refresh do token de 30 min, logout com revogação do
- * {@code jti} (auditado) e troca da própria senha. Não há auto-cadastro: usuários são criados pelo Admin.
+ * Sessão (RN57): login (auditado, registra último acesso e abre a sessão do token), refresh do token de 30 min,
+ * logout encerrando a sessão do {@code jti} (auditado) e troca da própria senha. Não há auto-cadastro: usuários são criados pelo Admin.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,7 +41,7 @@ public class AuthService {
     private final UserRepositoryPort userRepository;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
-    private final TokenRevocationService tokenRevocationService;
+    private final SessionService sessionService;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final CurrentUserPort currentUser;
@@ -56,26 +56,28 @@ public class AuthService {
         user.registerLogin(LocalDateTime.now(clock));
         User saved = userRepository.save(user);
         String token = jwtTokenProvider.generateToken(authentication);
+        startSession(token, saved.getUsername());
         auditService.recordAs(saved.getUsername(), ENTITY_NAME, saved.getId(), AuditAction.LOGIN, null);
         return session(token, saved);
     }
 
-    /** Emite novo token para o usuário autenticado e revoga o anterior (renovação por atividade). */
-    @Transactional(readOnly = true)
+    /** Emite novo token para o usuário autenticado e encerra a sessão do anterior (renovação por atividade). */
+    @Transactional
     public AuthResponse refresh(String currentToken) {
         User user = authenticatedUser();
         if (!user.isActive()) {
             throw new UnauthorizedException("Usuário inativo.");
         }
         String token = jwtTokenProvider.generateToken(user.getUsername(), List.of(user.getRole().name()));
-        revoke(currentToken);
+        startSession(token, user.getUsername());
+        endSession(currentToken, SessionEndReason.RENOVADA);
         return session(token, user);
     }
 
     /** Revoga o token atual e registra o encerramento da sessão na auditoria. */
     @Transactional
     public void logout(String currentToken) {
-        revoke(currentToken);
+        endSession(currentToken, SessionEndReason.LOGOUT);
         userRepository.findByUsername(currentUser.username()).ifPresent(user ->
                 auditService.record(ENTITY_NAME, user.getId(), AuditAction.LOGOUT, null));
     }
@@ -107,9 +109,13 @@ public class AuthService {
                 .orElseThrow(() -> new UnauthorizedException("Sessão inválida. Faça login novamente."));
     }
 
-    private void revoke(String token) {
+    private void startSession(String token, String username) {
+        sessionService.start(jwtTokenProvider.getJti(token), username, jwtTokenProvider.getExpiration(token));
+    }
+
+    private void endSession(String token, SessionEndReason reason) {
         if (token != null && jwtTokenProvider.validateToken(token)) {
-            tokenRevocationService.revoke(jwtTokenProvider.getJti(token), jwtTokenProvider.getExpiration(token));
+            sessionService.end(jwtTokenProvider.getJti(token), reason);
         }
     }
 

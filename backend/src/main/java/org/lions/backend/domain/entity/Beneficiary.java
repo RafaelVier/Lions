@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.lions.backend.application.support.CpfValidator;
 import org.lions.backend.application.support.LgpdMasker;
-import org.lions.backend.domain.enums.DocumentType;
 import org.lions.backend.domain.enums.NotificationChannel;
 import org.lions.backend.domain.exception.BusinessException;
 
@@ -33,9 +32,8 @@ public class Beneficiary {
 
     private Long id;
     private String fullName;
-    @Builder.Default
-    private DocumentType documentType = DocumentType.CPF;
-    private String documentNumber;
+    /** RN04 — CPF (somente dígitos) é a identificação única do beneficiário ativo; nulo após anonimização. */
+    private String cpf;
     private LocalDate birthDate;
     private String phone;
     private String email;
@@ -54,8 +52,9 @@ public class Beneficiary {
 
     private boolean legallyIncapable;
     private String legalGuardianName;
-    private String legalGuardianDocument;
+    private String legalGuardianCpf;
     private String legalGuardianPhone;
+    private String legalGuardianEmail;
     private String legalGuardianRelationship;
 
     private boolean consentGranted;
@@ -77,22 +76,22 @@ public class Beneficiary {
 
     /**
      * Valida o cadastro: RN05 (obrigatórios), RN04 (CPF válido), RN06 (responsável legal) e RN07 (consentimento).
-     * Normaliza o documento (apenas dígitos para CPF/CNPJ) e o tipo de documento (default CPF).
+     * Normaliza os CPFs (apenas dígitos).
      */
     public void validate(LocalDate today) {
-        if (documentType == null) {
-            documentType = DocumentType.CPF;
-        }
         if (notificationChannels == null) {
             notificationChannels = EnumSet.noneOf(NotificationChannel.class);
         }
-        if (documentNumber != null && documentType != DocumentType.ESTRANGEIRO) {
-            documentNumber = CpfValidator.normalize(documentNumber);
+        if (cpf != null) {
+            cpf = CpfValidator.normalize(cpf);
+        }
+        if (legalGuardianCpf != null) {
+            legalGuardianCpf = CpfValidator.normalize(legalGuardianCpf);
         }
 
         List<String> missing = new ArrayList<>();
         requireText(fullName, "nome completo", missing);
-        requireText(documentNumber, "documento", missing);
+        requireText(cpf, "CPF", missing);
         if (birthDate == null) {
             missing.add("data de nascimento");
         }
@@ -112,21 +111,21 @@ public class Beneficiary {
         if (birthDate.isAfter(today)) {
             throw new BusinessException("Data de nascimento não pode ser futura.");
         }
-        if (documentType == DocumentType.CPF && !CpfValidator.isValid(documentNumber)) {
+        if (!CpfValidator.isValid(cpf)) {
             throw new BusinessException("CPF inválido.");
-        }
-        if (documentType == DocumentType.CNPJ && documentNumber.length() != 14) {
-            throw new BusinessException("CNPJ deve conter 14 dígitos.");
         }
 
         if (requiresLegalGuardian(today)) {
             List<String> guardianMissing = new ArrayList<>();
             requireText(legalGuardianName, "nome do responsável legal", guardianMissing);
-            requireText(legalGuardianDocument, "documento do responsável legal", guardianMissing);
+            requireText(legalGuardianCpf, "CPF do responsável legal", guardianMissing);
             if (!guardianMissing.isEmpty()) {
                 throw new BusinessException("Beneficiário menor de idade ou legalmente incapaz exige responsável legal: "
                         + String.join(", ", guardianMissing) + ".");
             }
+        }
+        if (legalGuardianCpf != null && !CpfValidator.isValid(legalGuardianCpf)) {
+            throw new BusinessException("CPF do responsável legal inválido.");
         }
 
         if (!consentGranted || consentTimestamp == null) {
@@ -158,8 +157,8 @@ public class Beneficiary {
         return requiresLegalGuardian(today) ? legalGuardianName : fullName;
     }
 
-    public String signatoryDocument(LocalDate today) {
-        return requiresLegalGuardian(today) ? legalGuardianDocument : documentNumber;
+    public String signatoryCpf(LocalDate today) {
+        return requiresLegalGuardian(today) ? legalGuardianCpf : cpf;
     }
 
     public void inactivate(String reason, LocalDateTime now) {
@@ -193,8 +192,7 @@ public class Beneficiary {
         }
         String suffix = id == null ? "" : String.valueOf(id);
         this.fullName = "Beneficiário anonimizado " + suffix;
-        this.documentNumber = "ANON-" + suffix;
-        this.documentType = DocumentType.ESTRANGEIRO;
+        this.cpf = null;
         this.birthDate = null;
         this.phone = null;
         this.email = null;
@@ -209,8 +207,9 @@ public class Beneficiary {
         this.alternativeContactPhone = null;
         this.alternativeContactRelationship = null;
         this.legalGuardianName = null;
-        this.legalGuardianDocument = null;
+        this.legalGuardianCpf = null;
         this.legalGuardianPhone = null;
+        this.legalGuardianEmail = null;
         this.legalGuardianRelationship = null;
         this.notes = null;
         this.notificationChannels = EnumSet.noneOf(NotificationChannel.class);
@@ -223,8 +222,8 @@ public class Beneficiary {
         this.anonymizedAt = now;
     }
 
-    public String getMaskedDocument() {
-        return LgpdMasker.maskDocument(documentNumber);
+    public String getMaskedCpf() {
+        return LgpdMasker.maskDocument(cpf);
     }
 
     private static void requireText(String value, String label, List<String> missing) {
