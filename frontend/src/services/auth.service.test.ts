@@ -3,15 +3,10 @@ import { config } from '@/api/config';
 import { http } from '@/api/http';
 import { mockAuth } from '@/mocks/auth.mock';
 import { authService } from '@/services/auth.service';
+import { fakeAuthResponse } from '@/test/session';
 import type { AuthResponse } from '@/types/api';
 
-const RESPONSE: AuthResponse = {
-  token: 'a.b.c',
-  type: 'Bearer',
-  username: 'admin',
-  email: 'admin@lions.org',
-  role: 'ROLE_ADMIN',
-};
+const RESPONSE: AuthResponse = fakeAuthResponse('a.b.c');
 
 afterEach(() => {
   vi.restoreAllMocks();

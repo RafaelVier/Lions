@@ -102,6 +102,16 @@ function buildLoan(
     overdue,
     daysOverdue: overdue ? -offset : 0,
     dueSoon: !overdue && !returned && offset >= 0 && offset <= 7,
+    requiresLegalGuardian: false,
+    signedDocumentAvailable: true,
+    beneficiaryPhone: null,
+    signatoryName: seed.beneficiaryName,
+    whatsappLink: null,
+    canRenew: !returned && seed.renewals < 2, // RN23: no máximo 2 renovações
+    renewalBlockers: [],
+    renewals: [],
+    returnInfo: null,
+    adjustments: [],
   };
 }
 

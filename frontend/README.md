@@ -44,6 +44,22 @@ Para mudar algo só na sua máquina, crie o arquivo `frontend/.env.local` (ele n
 
 Para usar a API real, coloque `VITE_USE_MOCKS=false` no `.env.local` e reinicie o `npm run dev`.
 
+## Testar com o backend real
+
+O backend de referência está na branch `wip/onda1-servicos`. Todos os endpoints aparecem no Swagger: <http://localhost:8080/swagger-ui.html>.
+
+1. Em outra pasta, baixe e rode o backend (precisa do Java 21):
+   ```bash
+   git clone -b wip/onda1-servicos https://github.com/RafaelVier/Lions.git lions-backend
+   cd lions-backend/backend
+   ./gradlew bootRun
+   ```
+   No Windows: `gradlew.bat bootRun`. Espere aparecer `Started ...Application`.
+2. No frontend, crie `frontend/.env.local` com `VITE_USE_MOCKS=false` e rode `npm run dev`.
+3. Entre com `marcio` / `Lions@123` (administrador inicial do backend).
+
+O backend em modo dev usa banco em memória: tudo o que for cadastrado some quando ele é desligado.
+
 ## Pastas
 
 ```

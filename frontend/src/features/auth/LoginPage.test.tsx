@@ -9,7 +9,7 @@ import { resetHttp } from '@/api/http';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { resetSessionForTests, SESSION_KEY } from '@/features/auth/session';
 import { authService } from '@/services/auth.service';
-import { storeSession } from '@/test/session';
+import { fakeAuthResponse, storeSession } from '@/test/session';
 import type { AuthResponse } from '@/types/api';
 
 function renderLogin(entry: InitialEntry = '/login') {
@@ -117,17 +117,17 @@ describe('LoginPage', () => {
   });
 
   it.each([
-    { name: 'unknown role', patch: { role: 'ROLE_X' } },
+    {
+      name: 'unknown role',
+      patch: { user: { ...fakeAuthResponse('x').user, role: 'ROLE_X' } },
+    },
     { name: 'token without exp', patch: { token: 'sem-exp' } },
+    { name: 'no user', patch: { user: undefined } },
   ])(
     'shows the generic error and stores no session for an invalid login response ($name)',
     async ({ patch }) => {
       vi.spyOn(authService, 'login').mockResolvedValue({
-        token: tokenValidFor30Min(),
-        type: 'Bearer',
-        username: 'admin',
-        email: 'admin@lions.org',
-        role: 'ROLE_ADMIN',
+        ...fakeAuthResponse(tokenValidFor30Min()),
         ...patch,
       } as AuthResponse);
       const user = userEvent.setup();
