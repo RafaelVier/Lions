@@ -1,29 +1,35 @@
 package org.lions.backend.application.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import org.lions.backend.domain.entity.LoanReturn;
 import org.lions.backend.domain.enums.ReturnCondition;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class LoanReturnResponse {
-    private Long id;
-    private Long loanId;
-    private String patrimonyNumber;
-    private String beneficiaryName;
-    private LocalDate returnDate;
-    private ReturnCondition returnCondition;
-    private String returnConditionDescription;
-    private String damageDescription;
-    private String returnPhotoUrl;
-    private boolean hasDamage;
-    private boolean responsibilityAssigned;
-    private LocalDateTime createdAt;
+/** Devolução registrada (RN24/RN25) — imutável. */
+public record LoanReturnResponse(
+        Long id,
+        Long loanId,
+        LocalDate returnDate,
+        ReturnCondition returnCondition,
+        String returnConditionDescription,
+        String damageDescription,
+        String returnPhotoUrl,
+        boolean hasDamage,
+        String receivedBy,
+        LocalDateTime createdAt) {
+
+    public static LoanReturnResponse from(LoanReturn loanReturn) {
+        return new LoanReturnResponse(
+                loanReturn.getId(),
+                loanReturn.getLoanId(),
+                loanReturn.getReturnDate(),
+                loanReturn.getReturnCondition(),
+                loanReturn.getReturnCondition() != null ? loanReturn.getReturnCondition().getDescription() : null,
+                loanReturn.getDamageDescription(),
+                loanReturn.getReturnPhotoUrl(),
+                loanReturn.isHasDamage(),
+                loanReturn.getReceivedBy(),
+                loanReturn.getCreatedAt());
+    }
 }

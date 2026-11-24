@@ -1,28 +1,19 @@
 package org.lions.backend.application.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.lions.backend.domain.enums.UserRole;
+import java.time.Instant;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class AuthResponse {
+/**
+ * Sessão autenticada (RN57): token JWT (Bearer) válido por {@code expiresIn} segundos (30 min). Renove com
+ * {@code POST /auth/refresh} enquanto houver atividade; sem renovação a sessão expira por inatividade.
+ */
+public record AuthResponse(
+        String token,
+        String type,
+        long expiresIn,
+        Instant expiresAt,
+        UserResponse user) {
 
-    private String token;
-    private String type = "Bearer";
-    private String username;
-    private String email;
-    private UserRole role;
-
-    public AuthResponse(String token, String username, String email, UserRole role) {
-        this.token = token;
-        this.type = "Bearer";
-        this.username = username;
-        this.email = email;
-        this.role = role;
+    public static AuthResponse bearer(String token, long expiresInSeconds, Instant expiresAt, UserResponse user) {
+        return new AuthResponse(token, "Bearer", expiresInSeconds, expiresAt, user);
     }
 }

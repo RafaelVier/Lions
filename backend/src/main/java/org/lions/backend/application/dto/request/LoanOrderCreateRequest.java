@@ -1,57 +1,32 @@
 package org.lions.backend.application.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.lions.backend.domain.enums.DocumentType;
+import jakarta.validation.constraints.Size;
 import org.lions.backend.domain.enums.EquipmentType;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class LoanOrderCreateRequest {
-
-    // Etapa 1: Dados do Solicitante / Beneficiário
-    private boolean isForSelf; // true = Para mim, false = Outra pessoa
-    private String requesterName; // Nome de quem faz o pedido (se for terceiro)
-    private String relationship; // Ex: filho, assistente social
-    
-    @NotBlank(message = "O nome de quem vai usar o equipamento é obrigatório.")
-    private String beneficiaryName;
-
-    @NotNull(message = "O tipo de documento é obrigatório.")
-    private DocumentType documentType;
-
-    @NotBlank(message = "O número do documento é obrigatório.")
-    private String documentNumber;
-
-    @NotBlank(message = "O WhatsApp para contato é obrigatório.")
-    private String whatsapp;
-
-    private String cep;
-    private String street;
-    private String number;
-    private String neighborhood;
-    private String city;
-    private String state;
-    private String complement;
-
-    // Etapa 2: Escolha do Equipamento e Motivo
-    @NotNull(message = "O tipo de equipamento é obrigatório.")
-    private EquipmentType equipmentType;
-
-    private Integer quantity; // Padrão: 1
-
-    @NotBlank(message = "O motivo da necessidade do equipamento é obrigatório.")
-    private String needReason; // Dado sensível de saúde protegido pela LGPD
-
-    // Etapa 3: Consentimento (LGPD) e Modalidade
-    @NotNull(message = "O consentimento LGPD é obrigatório.")
-    private Boolean consentGranted;
-
-    private boolean assistedRegistration; // RF02: Cadastrado pelo administrador/Márcio
+/**
+ * Solicitação de empréstimo (formulário público em 3 etapas ou cadastro assistido).
+ * <ul>
+ *   <li>Etapa 1 — quem solicita: {@code forSelf} (padrão {@code true}); para terceiros, {@code requesterName} e
+ *   {@code requesterRelationship};</li>
+ *   <li>Etapa 1/2 — beneficiário: {@code beneficiary} com os dados completos (RN05) e o consentimento (RN07).
+ *   Se já existir beneficiário ativo com o documento, a solicitação é vinculada a ele (os dados não são alterados).
+ *   Usuários autenticados podem informar {@code beneficiaryId} no lugar de {@code beneficiary};</li>
+ *   <li>Etapa 2 — {@code equipmentType} e {@code needReason} (dado sensível de saúde — LGPD).</li>
+ * </ul>
+ */
+public record LoanOrderCreateRequest(
+        Boolean forSelf,
+        @Size(max = 150, message = "O nome do solicitante deve ter no máximo 150 caracteres.")
+        String requesterName,
+        @Size(max = 60, message = "O parentesco/vínculo deve ter no máximo 60 caracteres.")
+        String requesterRelationship,
+        Long beneficiaryId,
+        @Valid
+        BeneficiaryRequest beneficiary,
+        @NotNull(message = "O tipo de equipamento é obrigatório.")
+        EquipmentType equipmentType,
+        @Size(max = 2000, message = "O motivo deve ter no máximo 2000 caracteres.")
+        String needReason) {
 }

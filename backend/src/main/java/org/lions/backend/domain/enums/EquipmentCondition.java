@@ -1,11 +1,9 @@
 package org.lions.backend.domain.enums;
 
 public enum EquipmentCondition {
-    NOVO("Novo"),
-    SEMINOVO("Seminovo"),
-    USADO("Usado"),
-    EM_MANUTENCAO("Em Manutenção"),
-    BAIXADO("Baixado");
+    BOM("Bom"),
+    REGULAR("Regular"),
+    RUIM("Ruim");
 
     private final String description;
 

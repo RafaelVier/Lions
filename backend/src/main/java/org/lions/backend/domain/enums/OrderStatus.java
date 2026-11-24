@@ -1,10 +1,10 @@
 package org.lions.backend.domain.enums;
 
 public enum OrderStatus {
-    PENDENTE_ANALISE("Pendente de Análise"),
+    PENDENTE_ANALISE("Pendente de análise"),
     APROVADO("Aprovado"),
     REJEITADO("Rejeitado"),
-    PENDENTE_ESTOQUE("Pendente por Falta de Estoque"),
+    EM_FILA_ESPERA("Em fila de espera"),
     CANCELADO("Cancelado");
 
     private final String description;
