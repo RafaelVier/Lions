@@ -1,0 +1,3 @@
+# Fim de linha LF em todos os sistemas (o Prettier formata com LF).
+# Sem isso, no Windows o git baixa CRLF e o `npm run check` marca todos os arquivos como alterados.
+* text=auto eol=lf

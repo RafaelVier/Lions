@@ -1,6 +1,6 @@
 import { isApiError } from '@/api/errors';
 import { getJwtExpMs } from '@/lib/jwt';
-import { USER_ROLE_LABEL, type AuthResponse, type UserRole } from '@/types/api';
+import { USER_ROLE_LABEL, type AuthResponse, type UserResponse, type UserRole } from '@/types/api';
 
 // Sessão em TypeScript puro; o AuthProvider expõe isto ao React.
 
@@ -105,8 +105,16 @@ function notify(session: Session | null, reason: SessionEndReason | null): void 
   for (const listener of [...listeners]) listener(session, reason);
 }
 
+// O backend manda o usuário aninhado em `user`. Campos ausentes ficam undefined e a validação
+// (toValidSession / setSession) recusa a resposta, como em qualquer resposta fora do contrato.
 export function sessionFromAuth(res: AuthResponse): Session {
-  return { token: res.token, username: res.username, email: res.email, role: res.role };
+  const user: Partial<UserResponse> = res?.user ?? {};
+  return {
+    token: res?.token,
+    username: user.username,
+    email: user.email,
+    role: user.role,
+  } as Session;
 }
 
 export function getSession(): Session | null {
@@ -181,7 +189,7 @@ function refreshOnce(
         lastRefreshSettledAt = now();
         if (!stillCurrent()) return;
         // resposta fora do contrato (perfil desconhecido, exp vencido) conta como falha
-        const session = toValidSession(res);
+        const session = toValidSession(sessionFromAuth(res));
         if (session === null) onFailure();
         else setSession(session);
       },

@@ -1,4 +1,4 @@
-// Espelha os DTOs do backend em origin/wip/onda0-fundacao (16/11/2026). Ajustar quando o contrato mudar.
+// Espelha os DTOs do backend da branch wip/onda1-servicos. Confira no Swagger quando o backend mudar.
 
 export type UserRole = 'ROLE_ADMIN' | 'ROLE_OPERATOR' | 'ROLE_VIEWER';
 export type EquipmentStatus =
@@ -9,8 +9,8 @@ export type EquipmentCondition = 'BOM' | 'REGULAR' | 'RUIM';
 export type LoanStatus = 'PENDENTE_ASSINATURA' | 'ATIVO' | 'ATRASADO' | 'DEVOLVIDO' | 'CANCELADO';
 export type OrderStatus =
   'PENDENTE_ANALISE' | 'APROVADO' | 'REJEITADO' | 'EM_FILA_ESPERA' | 'CANCELADO';
-export type DocumentType = 'CPF' | 'ESTRANGEIRO' | 'CNPJ';
 export type SignatureType = 'FISICA_DIGITALIZADA' | 'DIGITAL';
+export type ReturnCondition = 'BOM_ESTADO' | 'PRECISA_MANUTENCAO' | 'DANIFICADO';
 export type WriteOffReason = 'INSERVIVEL' | 'PERDA' | 'FURTO' | 'DOACAO';
 
 export const USER_ROLE_LABEL: Record<UserRole, string> = {
@@ -54,12 +54,25 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface UserResponse {
+  id: number;
+  username: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  roleDescription: string | null;
+  active: boolean;
+  lastLoginAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface AuthResponse {
   token: string;
   type: 'Bearer';
-  username: string;
-  email: string;
-  role: UserRole;
+  expiresIn: number; // segundos
+  expiresAt: string;
+  user: UserResponse;
 }
 
 export interface ProblemDetail {
@@ -71,12 +84,19 @@ export interface ProblemDetail {
 }
 
 // Datas (LocalDate/LocalDateTime) chegam como string ISO.
+export interface EquipmentSpecification {
+  name: string;
+  value: string;
+}
+
 export interface EquipmentResponse {
   id: number;
   patrimonyNumber: string;
   type: EquipmentType;
   typeDescription: string;
   size: string | null;
+  manufactureYear: number | null;
+  specifications: EquipmentSpecification[] | null;
   condition: EquipmentCondition | null;
   conditionDescription: string | null;
   status: EquipmentStatus;
@@ -133,14 +153,53 @@ export interface LoanResponse {
   overdue: boolean;
   daysOverdue: number;
   dueSoon: boolean;
+  requiresLegalGuardian: boolean;
+  signedDocumentAvailable: boolean;
+  beneficiaryPhone: string | null;
+  signatoryName: string | null;
+  whatsappLink: string | null;
+  canRenew: boolean | null;
+  renewalBlockers: string[] | null;
+  renewals: LoanRenewalResponse[] | null;
+  returnInfo: LoanReturnResponse | null;
+  adjustments: AdjustmentResponse[] | null;
+}
+
+export interface LoanRenewalResponse {
+  id: number;
+  loanId: number;
+  previousDueDate: string;
+  newDueDate: string;
+  renewedBy: string | null;
+  renewedAt: string | null;
+}
+
+export interface LoanReturnResponse {
+  id: number;
+  loanId: number;
+  returnDate: string;
+  returnCondition: ReturnCondition | null;
+  returnConditionDescription: string | null;
+  damageDescription: string | null;
+  returnPhotoUrl: string | null;
+  hasDamage: boolean;
+  receivedBy: string | null;
+  createdAt: string | null;
+}
+
+export interface AdjustmentResponse {
+  id: number;
+  description: string;
+  reason: string | null;
+  registeredBy: string | null;
+  registeredAt: string | null;
 }
 
 export interface LoanOrderResponse {
   id: number | null;
   beneficiaryId: number | null;
   beneficiaryName: string | null;
-  documentType: DocumentType | null;
-  maskedDocument: string | null;
+  maskedCpf: string | null;
   phone: string | null;
   city: string | null;
   state: string | null;
@@ -159,13 +218,43 @@ export interface LoanOrderResponse {
   createdAt: string | null;
 }
 
-export interface DashboardIndicatorsResponse {
-  totalEquipments: number;
-  availableEquipments: number;
-  loanedEquipments: number;
-  maintenanceEquipments: number;
-  pendingOrdersCount: number;
-  pendingOrders: LoanOrderResponse[] | null;
-  dueThisWeekLoans: LoanResponse[] | null;
-  overdueLoans: LoanResponse[] | null;
+// GET /dashboard. Valores BigDecimal (taxas e custos) chegam como número.
+export interface DashboardResponse {
+  start: string | null;
+  end: string | null;
+  equipmentType: EquipmentType | null;
+  generatedAt: string;
+  personalDataHidden: boolean;
+  occupancy: {
+    activeEquipments: number;
+    available: number;
+    reserved: number;
+    loaned: number;
+    inMaintenance: number;
+    writtenOff: number;
+    occupancyRate: number;
+  };
+  overdueLoans: number;
+  waitlist: { waiting: number; reserved: number };
+  maintenanceCost: number;
+  loanVolume: { loans: number; canceled: number; returns: number; openLoans: number };
+  byType: {
+    type: EquipmentType;
+    description: string;
+    activeEquipments: number;
+    loaned: number;
+    occupancyRate: number;
+    overdueLoans: number;
+    waiting: number;
+    maintenanceCost: number;
+    loans: number;
+  }[];
+  overdueItems: {
+    loanId: number;
+    beneficiaryName: string | null;
+    patrimonyNumber: string;
+    type: EquipmentType;
+    expectedReturnDate: string;
+    daysOverdue: number;
+  }[];
 }

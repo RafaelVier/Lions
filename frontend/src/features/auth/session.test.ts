@@ -17,6 +17,7 @@ import {
   subscribe,
   waitForRefresh,
 } from '@/features/auth/session';
+import { fakeAuthResponse } from '@/test/session';
 import type { AuthResponse } from '@/types/api';
 
 const MIN = 60_000;
@@ -43,13 +44,7 @@ const valid: Session = {
 // Token de 60 min: quem encerra a sessão é a inatividade, não o exp.
 const longLived: Session = { ...valid, token: jwt(nowSeconds + 60 * 60) };
 
-const refreshed: AuthResponse = {
-  token: jwt(nowSeconds + 58 * 60),
-  type: 'Bearer',
-  username: 'admin',
-  email: 'admin@lions.org',
-  role: 'ROLE_ADMIN',
-};
+const refreshed: AuthResponse = fakeAuthResponse(jwt(nowSeconds + 58 * 60));
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
@@ -434,7 +429,7 @@ describe('session manager', () => {
     markActivity();
     const refresh = vi
       .fn()
-      .mockResolvedValueOnce({ ...refreshed, role: 'ROLE_X' })
+      .mockResolvedValueOnce({ ...refreshed, user: { ...refreshed.user, role: 'ROLE_X' } })
       .mockResolvedValueOnce(refreshed);
     startSessionManager({ refresh });
 

@@ -104,6 +104,8 @@ export function createSeedEquipment(today: Date = new Date()): EquipmentResponse
       type: seed.type,
       typeDescription: EQUIPMENT_TYPE_LABEL[seed.type],
       size: seed.size,
+      manufactureYear: 2018 + (index % 6),
+      specifications: [],
       condition: seed.condition,
       conditionDescription: EQUIPMENT_CONDITION_LABEL[seed.condition],
       status: seed.status,

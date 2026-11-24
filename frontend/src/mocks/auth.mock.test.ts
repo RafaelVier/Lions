@@ -17,17 +17,19 @@ describe('mockAuth', () => {
   it.each(MOCK_USERS)('logs in $username by username and by e-mail', async (user) => {
     for (const login of [user.username, user.email]) {
       const res = await mockAuth.login({ username: login, password: MOCK_PASSWORD });
-      expect(res.role).toBe(user.role);
+      expect(res.user.role).toBe(user.role);
       expect(res.type).toBe('Bearer');
-      expect(res.username).toBe(user.username);
-      expect(res.email).toBe(user.email);
+      expect(res.user.username).toBe(user.username);
+      expect(res.user.email).toBe(user.email);
       expect(getJwtExpMs(res.token)).toBe(NOW + 1800 * 1000);
+      expect(res.expiresIn).toBe(1800);
+      expect(res.expiresAt).toBe(new Date(NOW + 1800 * 1000).toISOString());
     }
   });
 
   it('accepts surrounding spaces and upper case in the username', async () => {
     const res = await mockAuth.login({ username: '  ADMIN@Lions.org ', password: MOCK_PASSWORD });
-    expect(res.username).toBe('admin');
+    expect(res.user.username).toBe('admin');
   });
 
   it('rejects a wrong password with 401 and the exact message', async () => {
@@ -48,8 +50,8 @@ describe('mockAuth', () => {
     const { token } = await mockAuth.login({ username: 'operador', password: MOCK_PASSWORD });
     vi.setSystemTime(NOW + 60_000);
     const res = await mockAuth.refresh(token);
-    expect(res.username).toBe('operador');
-    expect(res.role).toBe('ROLE_OPERATOR');
+    expect(res.user.username).toBe('operador');
+    expect(res.user.role).toBe('ROLE_OPERATOR');
     expect(getJwtExpMs(res.token)).toBe(NOW + 60_000 + 1800 * 1000);
 
     await expect(mockAuth.refresh('lixo')).rejects.toMatchObject({ status: 401 });

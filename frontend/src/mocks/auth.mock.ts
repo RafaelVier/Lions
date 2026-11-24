@@ -2,14 +2,38 @@ import { config } from '@/api/config';
 import { ApiError } from '@/api/errors';
 import { decodeJwtPayload, getJwtExpMs } from '@/lib/jwt';
 import { mockDelay } from '@/mocks/delay';
-import type { AuthResponse, LoginRequest, UserRole } from '@/types/api';
+import { USER_ROLE_LABEL, type AuthResponse, type LoginRequest, type UserRole } from '@/types/api';
 
 export const MOCK_PASSWORD = 'lions2026';
 
-export const MOCK_USERS: ReadonlyArray<{ username: string; email: string; role: UserRole }> = [
-  { username: 'admin', email: 'admin@lions.org', role: 'ROLE_ADMIN' },
-  { username: 'operador', email: 'operador@lions.org', role: 'ROLE_OPERATOR' },
-  { username: 'consulta', email: 'consulta@lions.org', role: 'ROLE_VIEWER' },
+export const MOCK_USERS: ReadonlyArray<{
+  id: number;
+  username: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+}> = [
+  {
+    id: 1,
+    username: 'admin',
+    fullName: 'Administrador',
+    email: 'admin@lions.org',
+    role: 'ROLE_ADMIN',
+  },
+  {
+    id: 2,
+    username: 'operador',
+    fullName: 'Operador',
+    email: 'operador@lions.org',
+    role: 'ROLE_OPERATOR',
+  },
+  {
+    id: 3,
+    username: 'consulta',
+    fullName: 'Consulta',
+    email: 'consulta@lions.org',
+    role: 'ROLE_VIEWER',
+  },
 ];
 
 const UNAUTHENTICATED_TITLE = 'Não autenticado';
@@ -35,13 +59,26 @@ export function createFakeJwt(
   return `${header}.${payload}.mock`;
 }
 
+// Mesmo formato do AuthResponse do backend (usuário aninhado em `user`).
 function buildResponse(user: (typeof MOCK_USERS)[number]): AuthResponse {
+  const ttl = config.mockTokenTtlSeconds;
   return {
-    token: createFakeJwt(user.username, user.role, config.mockTokenTtlSeconds),
+    token: createFakeJwt(user.username, user.role, ttl),
     type: 'Bearer',
-    username: user.username,
-    email: user.email,
-    role: user.role,
+    expiresIn: ttl,
+    expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
+    user: {
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      roleDescription: USER_ROLE_LABEL[user.role],
+      active: true,
+      lastLoginAt: null,
+      createdAt: null,
+      updatedAt: null,
+    },
   };
 }
 
