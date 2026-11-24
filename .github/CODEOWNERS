@@ -6,7 +6,7 @@
 /db/           @HerickCallegari
 /docs/         @ambarussian
 /frontend/     @rafavieira1 @Vitor-Klein
-/infra/        @paladini-qa
+/infra/        @paladini-qa @RafaelVier
 
 # Configurações de infra/CI exigem ambos
-/.github/      @RafaelVier
+/.github/      @RafaelVier @GiovaneAguirre77 @paladini-qa @josedev2003
