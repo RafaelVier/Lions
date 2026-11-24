@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Cores e fonte do sistema, tiradas do Figma. O modo escuro usa a classe `dark` no <html>.
+ * Os tokens `*-fg` são versões mais escuras de texto para manter boa leitura (contraste AA).
+ */
+:root {
+  /* controles nativos (barra de rolagem, campos de data, autofill) no mesmo tema */
+  color-scheme: light;
+  --primary: #0b3c95;
+  --primary-strong: #00276c;
+  --on-primary: #ffffff;
+  --accent: #feae2c;
+  --on-accent: #2b1b00;
+  --background: #f8f9ff;
+  --surface: #ffffff;
+  --field: #eff4ff;
+  --ink: #0b1c30;
+  --line: #e2e8f5;
+  --muted: #64748b;
+  --muted-fg: #475569;
+  --success-fg: #166534;
+  --warning-fg: #92400e;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --info: #1d4ed8;
+}
+
+.dark {
+  color-scheme: dark;
+  --primary: #7aa2f7;
+  --primary-strong: #a9c2fa;
+  --on-primary: #0a1426;
+  --accent: #feae2c;
+  --on-accent: #2b1b00;
+  --background: #0a1426;
+  --surface: #111d35;
+  --field: #1a2a48;
+  --ink: #e8eefb;
+  --line: #243656;
+  --muted: #9aa9c2;
+  --muted-fg: #9aa9c2;
+  --success-fg: #4ade80;
+  --warning-fg: #fbbf24;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #7aa2f7;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-field: var(--field);
+  --color-ink: var(--ink);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-muted-fg: var(--muted-fg);
+  --color-success-fg: var(--success-fg);
+  --color-warning-fg: var(--warning-fg);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--ink);
+    font-family: var(--font-sans);
+  }
+}
