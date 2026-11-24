@@ -55,7 +55,55 @@ Descrição completa (perfis, regras, variáveis de ambiente, rotinas e rotas):
 
 
 ### frontend
-Projeto frontend
+Interface web do **OrtoEmpresta** (Banco Ortopédico do Lions Clube de Medianeira), baseada no protótipo do Figma.
+
+#### 🛠️ Tecnologias
+- **Linguagem:** TypeScript
+- **Framework:** React 19 + Vite 8
+- **Estilo:** Tailwind CSS 4
+- **Rotas:** React Router 7, com rotas protegidas por perfil (Administrador, Operador, Consulta)
+- **Dados da API:** TanStack Query 5
+- **Formulários e validação:** React Hook Form + Zod
+- **PWA:** vite-plugin-pwa (pode ser instalado no celular)
+
+#### 🏛️ Arquitetura
+Organizado por funcionalidade (pastas dentro de `frontend/src/`): cada tela tem a sua pasta, o que reduz conflito entre a equipe.
+
+- **`features/`:** uma pasta por tela (`auth`, `dashboard`, `equipment`, `loans`, `reports`, `beneficiaries`, `waitlist`, `users`, `help`).
+- **`services/`:** única porta de entrada dos dados. Cada service chama a API real ou os dados de exemplo.
+- **`api/`:** cliente HTTP, com token JWT e tratamento de erros no padrão do backend (ProblemDetail).
+- **`mocks/`:** dados de exemplo, para o front funcionar enquanto os endpoints não ficam prontos.
+- **`types/`:** tipos iguais aos DTOs do backend.
+- **`components/`:** componentes reutilizáveis (`ui/`) e layout (menu lateral, barra superior).
+
+A troca entre dados de exemplo e API real é feita pela variável `VITE_USE_MOCKS`, sem mudar as telas.
+
+#### ⚙️ Como Executar o Frontend Localmente
+
+1. **Pré-requisitos:** Node.js 22 ou mais novo ([nodejs.org](https://nodejs.org))
+
+2. **Entrar no diretório e instalar as dependências:**
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+3. **Executar (com dados de exemplo, sem precisar do backend):**
+   ```bash
+   npm run dev
+   ```
+   Acesse [http://localhost:5173](http://localhost:5173) e entre com `admin` / `lions2026`.
+
+   Outros comandos úteis:
+   ```bash
+   npm test         # roda os testes
+   npm run build    # gera a versão final em dist/
+   npm run check    # formata, roda lint, testes e build (rodar antes do PR)
+   ```
+
+4. **Usar a API real:** crie `frontend/.env.local` com `VITE_USE_MOCKS=false`. O Vite repassa `/api` para o backend em `http://localhost:8080`.
+
+Mais detalhes (usuários de teste, regras da equipe e divisão das telas) em [`frontend/README.md`](frontend/README.md).
 
 ### infra - Definições de infraestrutura e manifestos de configuração
 MER: https://lucid.app/lucidchart/4c0faa0a-7257-4d49-aa22-3be76df1b543/edit?viewport_loc=-1354%2C-371%2C1895%2C1003%2C0_0&invitationId=inv_9a4e1d8e-d762-467f-bb5f-3b2ee6f9e779

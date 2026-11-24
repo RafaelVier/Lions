@@ -1,5 +1,6 @@
 HELP.md
 .gradle
+.gradle-ci/
 build/
 data/
 !gradle/wrapper/gradle-wrapper.jar
