@@ -1,39 +1,42 @@
-name: Frontend CI
+name: Frontend CI/CD
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Permite rodar manualmente pela aba Actions no GitHub
   pull_request:
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yaml'
   push:
     branches:
-      - main
+      - main # Só faz push no Docker Hub e deploy na VM quando entra na main
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yaml'
 
 permissions:
-  contents: read
+  contents: read # Permissão mínima necessária para ler o código do repositório
 
 concurrency:
+  # Evita que dois deploys/builds antigos da mesma branch fiquem rodando em paralelo
   group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build and test frontend
+  build-and-deploy:
+    name: Build, test, publish and deploy frontend
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
       run:
-        working-directory: frontend
+        working-directory: frontend # Roda comandos de shell por padrão dentro de ./frontend
         shell: bash
 
     steps:
+      # 1. Baixa o código do repositório para o runner do GitHub Actions
       - name: Check out repository
         uses: actions/checkout@v4
 
+      # 2. Verifica se já existe frontend/package.json (útil em etapas iniciais do repo)
       - name: Check frontend project files
         run: |
           if [[ ! -f package.json ]]; then
@@ -43,17 +46,31 @@ jobs:
             echo "HAS_PACKAGE_JSON=true" >> "$GITHUB_ENV"
           fi
 
-      # ALTERAR QUANDO A STACK DO FRONTEND CHEGAR:
-      # Configurar Node/gerenciador de pacotes e rodar lint, testes e build da aplicação
-      - name: Build and test frontend
+      # 3. Instala o Node.js 22.x com cache do npm baseado no package-lock.json
+      - name: Set up Node.js
         if: env.HAS_PACKAGE_JSON == 'true'
-        run: |
-          echo "Placeholder da stack do frontend: ajustar comandos de install, lint, test e build"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
+      # 4. Instala dependências de forma limpa e reproduzível usando o lockfile
+      - name: Install dependencies
+        if: env.HAS_PACKAGE_JSON == 'true'
+        run: npm ci
+
+      # 5. Executa formatação, lint, testes unitários e build de produção do front-end
+      - name: Run frontend checks (format, lint, test, build)
+        if: env.HAS_PACKAGE_JSON == 'true'
+        run: npm run check
+
+      # 6. Prepara o Docker Buildx para builds modernos e cache de camadas
       - name: Set up Docker Buildx
         if: env.HAS_PACKAGE_JSON == 'true'
         uses: docker/setup-buildx-action@v4
 
+      # 7. Gera as tags da imagem (SHA do commit + 'latest' quando for push na main)
       - name: Generate Docker image tags
         id: docker-meta
         if: env.HAS_PACKAGE_JSON == 'true'
@@ -64,6 +81,7 @@ jobs:
             type=sha,format=long
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
+      # 8. Garante que variáveis e segredos do Docker Hub estão configurados antes de publicar
       - name: Validate Docker Hub configuration
         if: env.HAS_PACKAGE_JSON == 'true' && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         env:
@@ -72,10 +90,11 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           if [[ -z "$DOCKERHUB_IMAGE" || -z "$DOCKERHUB_USERNAME" || -z "$DOCKERHUB_TOKEN" ]]; then
-            echo "::error::Configure DOCKERHUB_IMAGE and DOCKERHUB_USERNAME repository variables and the DOCKERHUB_TOKEN secret."
+            echo "::error::Configure DOCKERHUB_IMAGE e DOCKERHUB_USERNAME (Variables) e DOCKERHUB_TOKEN (Secret)."
             exit 1
           fi
 
+      # 9. Autentica no Docker Hub usando usuário e Access Token
       - name: Log in to Docker Hub
         if: env.HAS_PACKAGE_JSON == 'true' && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: docker/login-action@v4
@@ -83,7 +102,8 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Docker image and publish from default branch
+      # 10. Faz build da imagem Docker em ./frontend e publica no Docker Hub (apenas fora de PR na branch padrão)
+      - name: Build and push Docker image
         if: env.HAS_PACKAGE_JSON == 'true'
         uses: docker/build-push-action@v7
         with:
@@ -93,3 +113,27 @@ jobs:
           labels: ${{ steps.docker-meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # 11. Conecta na VM via SSH e atualiza o container do front-end via Docker Compose
+      - name: Deploy to VM via SSH
+        if: env.HAS_PACKAGE_JSON == 'true' && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }} # IP ou domínio da VM
+          username: ${{ secrets.VM_USER }} # Usuário Linux na VM (ex: ubuntu ou debian)
+          key: ${{ secrets.VM_SSH_KEY }} # Chave privada SSH (sem senha ou com passphrase se usar)
+          port: ${{ vars.VM_SSH_PORT || '22' }} # Porta SSH (padrão 22)
+          script: |
+            set -e
+            # Vai até a pasta onde está o docker-compose.yml na VM
+            cd "${{ vars.VM_COMPOSE_DIR }}"
+
+            # Se o repositório Docker Hub for privado, descomente/garanta login na VM antes do pull:
+            # echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ vars.DOCKERHUB_USERNAME }}" --password-stdin
+
+            # Baixa a imagem mais recente do serviço frontend e recria apenas ele
+            docker compose pull ${{ vars.VM_FRONTEND_SERVICE || 'frontend' }}
+            docker compose up -d --no-deps ${{ vars.VM_FRONTEND_SERVICE || 'frontend' }}
+
+            # Limpa imagens antigas não utilizadas para não encher o disco da VM
+            docker image prune -f
