@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +22,7 @@ class RagSettings(BaseSettings):
     embeddingBatchSize: int = Field(default=32, gt=0, alias="RAG_EMBEDDING_BATCH_SIZE")
     chunkMaxTokens: int = Field(default=350, gt=0, alias="RAG_CHUNK_MAX_TOKENS")
     chunkOverlapTokens: int = Field(default=60, ge=0, alias="RAG_CHUNK_OVERLAP_TOKENS")
+    databaseUrl: SecretStr | None = Field(default=None, alias="RAG_DATABASE_URL")
 
     @model_validator(mode="after")
     def validateChunking(self) -> "RagSettings":

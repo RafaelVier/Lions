@@ -15,6 +15,7 @@ def clearRagEnvironment(monkeypatch: pytest.MonkeyPatch) -> None:
         "RAG_EMBEDDING_BATCH_SIZE",
         "RAG_CHUNK_MAX_TOKENS",
         "RAG_CHUNK_OVERLAP_TOKENS",
+        "RAG_DATABASE_URL",
     ]:
         monkeypatch.delenv(name, raising=False)
 
@@ -28,6 +29,7 @@ def testUsesDefaultValues() -> None:
     assert settings.embeddingBatchSize == 32
     assert settings.chunkMaxTokens == 350
     assert settings.chunkOverlapTokens == 60
+    assert settings.databaseUrl is None
 
 
 def testReadsEnvironmentVariables(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,6 +45,17 @@ def testReadsEnvironmentVariables(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.embeddingBatchSize == 8
     assert settings.chunkMaxTokens == 200
     assert settings.chunkOverlapTokens == 20
+
+
+def testReadsDatabaseUrlAsSecret(monkeypatch: pytest.MonkeyPatch) -> None:
+    databaseUrl = "postgresql://rag:senha-ficticia@localhost/rag"
+    monkeypatch.setenv("RAG_DATABASE_URL", databaseUrl)
+
+    settings = RagSettings()
+
+    assert settings.databaseUrl is not None
+    assert settings.databaseUrl.get_secret_value() == databaseUrl
+    assert "senha-ficticia" not in repr(settings)
 
 
 def testAcceptsFieldNames() -> None:
