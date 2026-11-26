@@ -81,6 +81,10 @@ Em outro terminal, na pasta `rag`, execute `uv run --locked pytest`. O serviço 
 
 O módulo de extração oferece funções internas para TXT/Markdown em UTF-8 e PDF com texto extraível, com limite de 5 MiB por arquivo. A extração de PDF preserva a ordem das páginas e não realiza OCR. Essas funções ainda não estão disponíveis por upload na API.
 
+O cadastro interno de documentos usa um banco PostgreSQL 16 próprio do RAG. Quando o banco estiver disponível, configure `RAG_DATABASE_URL` com a URL desse banco e execute `uv run --locked alembic upgrade head` na pasta `rag`. Para revisar o SQL sem conexão, use `uv run --locked alembic upgrade head --sql`.
+
+Para rodar os testes de persistência, configure `RAG_TEST_DATABASE_URL` com um banco de teste separado e uma conta com permissão de criar esquemas. Execute `uv run --locked pytest tests/testPostgresDocumentRepository.py`. Os testes criam e removem um esquema isolado. A suíte padrão pula esses testes quando a variável está ausente.
+
 ### frontend
 Projeto frontend
 
