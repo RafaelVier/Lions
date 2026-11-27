@@ -1,0 +1,9 @@
+# Somente no runner de CI. Produção não publica a porta do PostgreSQL.
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+networks:
+  database:
+    internal: false

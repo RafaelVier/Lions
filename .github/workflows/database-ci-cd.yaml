@@ -1,0 +1,45 @@
+name: Database CI/CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/postgres-tests.yaml
+
+  deploy:
+    name: Deploy PostgreSQL on VM via SSH
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      # Shared with backend deploy: do not update the database during migrations.
+      group: backend-production
+      cancel-in-progress: false
+    steps:
+      - name: Check out deployment files
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Deploy PostgreSQL
+        env:
+          SSH_HOST: ${{ vars.SSH_HOST }}
+          SSH_USER: ${{ vars.SSH_USER }}
+          SSH_PORT: ${{ vars.SSH_PORT || '22' }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/lions/backend' }}
+          DATABASE_DEPLOY_PATH: ${{ vars.DATABASE_DEPLOY_PATH || '/opt/lions/database' }}
+        run: |
+          bash infra/scripts/deploy-via-ssh.sh database
+          echo '### PostgreSQL implantado e conexão da aplicação verificada' >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,3 @@
+.env.prod
+.release.env
+.release.env.*

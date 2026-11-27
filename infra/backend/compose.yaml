@@ -1,0 +1,33 @@
+name: lions-backend
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?Informe a imagem publicada com digest}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:?Configure SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:?Configure SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Configure SPRING_DATASOURCE_PASSWORD}
+      LIONS_JWT_SECRET: ${LIONS_JWT_SECRET:?Configure LIONS_JWT_SECRET}
+      LIONS_ADMIN_PASSWORD: ${LIONS_ADMIN_PASSWORD:?Configure LIONS_ADMIN_PASSWORD}
+      LIONS_STORAGE_DIR: /app/data/storage
+      TZ: America/Sao_Paulo
+    ports:
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - storage:/app/data/storage
+    networks:
+      - default
+      - database
+
+volumes:
+  storage:
+
+networks:
+  default: {}
+  database:
+    external: true
+    name: lions-internal

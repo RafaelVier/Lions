@@ -1,10 +1,10 @@
-# Backend CI e publicação
+# Backend CI/CD e publicação
 
 Todo pull request executa `clean build bootJar`, incluindo os testes disponíveis,
 e salva os relatórios por sete dias. PRs não acessam o Docker Hub nem alteram a
 versão no repositório.
 
-Para publicar, abra **Actions > Backend CI > Run workflow**, selecione uma branch
+Para publicar, abra **Actions > Backend CI/CD > Run workflow**, selecione uma branch
 e informe `new_version`, por exemplo `1.0.0` ou `1.1.0-SNAPSHOT`.
 O resumo da execução mostra a versão atual e a versão solicitada.
 
