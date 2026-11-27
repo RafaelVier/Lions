@@ -1,0 +1,86 @@
+name: PostgreSQL tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test PostgreSQL initialization and Flyway migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Disposable CI database only. Production credentials stay on the VM.
+      POSTGRES_PASSWORD: ci_admin_password
+      APP_DB_NAME: lionsdb
+      APP_DB_USER: lions
+      APP_DB_PASSWORD: ci_application_password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/lionsdb
+      SPRING_DATASOURCE_USERNAME: lions
+      SPRING_DATASOURCE_PASSWORD: ci_application_password
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_FLYWAY_ENABLED: 'true'
+      POSTGRES_MIGRATIONS_TEST: 'true'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check deployment scripts
+        run: |
+          bash -n infra/scripts/deploy-via-ssh.sh
+          for script in infra/database/*.sh; do bash -n "$script"; done
+          node --test infra/backend/deploy.test.mjs infra/database/deploy.test.mjs infra/scripts/deploy-via-ssh.test.mjs
+
+      - name: Initialize disposable PostgreSQL using production configuration
+        run: |
+          cp infra/database/.env.database.example infra/database/.env.database
+          docker volume create lions-postgres-data
+          docker compose --env-file infra/database/.env.database -f infra/database/compose.yaml -f infra/database/compose.ci.yaml up -d --wait --wait-timeout 180 postgres
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Test schema, migration upgrade and persistence against PostgreSQL
+        working-directory: backend
+        run: bash ./gradlew cleanTest test --tests '*PostgresMigrationsIT' --tests '*LionsBackendApplicationTests' --tests '*PersistenceAdaptersIT' --no-daemon --stacktrace
+
+      - name: Verify backup and data persistence after container replacement
+        run: |
+          bash infra/database/backup.sh "$GITHUB_WORKSPACE/infra/database"
+          compose=(docker compose --env-file infra/database/.env.database -f infra/database/compose.yaml -f infra/database/compose.ci.yaml)
+          backup_file=$(find infra/database/backups -name '*.dump' -type f | head -n 1)
+          "${compose[@]}" exec -T postgres psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE lions_restore_ci OWNER lions'
+          "${compose[@]}" exec -T postgres pg_restore -U postgres -d lions_restore_ci --exit-on-error < "$backup_file"
+          restored=$("${compose[@]}" exec -T postgres psql -U lions -d lions_restore_ci -Atc "SELECT count(*) FROM migration_upgrade_ci.tb_users WHERE username = 'ci_existing_user'")
+          [[ "$restored" == 1 ]]
+          "${compose[@]}" up -d --force-recreate --wait --wait-timeout 180 postgres
+          count=$("${compose[@]}" exec -T postgres psql -U lions -d lionsdb -Atc "SELECT count(*) FROM migration_upgrade_ci.tb_users WHERE username = 'ci_existing_user'")
+          [[ "$count" == 1 ]]
+
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-test-reports
+          path: |
+            backend/build/reports/tests/
+            backend/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop disposable PostgreSQL
+        if: always()
+        run: docker compose --env-file infra/database/.env.database -f infra/database/compose.yaml -f infra/database/compose.ci.yaml down

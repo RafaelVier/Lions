@@ -1,4 +1,4 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   pull_request:
@@ -13,10 +13,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: backend-ci-${{ github.event_name }}-${{ github.ref }}
+  group: backend-ci-cd-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  database-test:
+    name: Validate PostgreSQL and migrations
+    uses: ./.github/workflows/postgres-tests.yaml
+
   build:
     name: Build and test backend
     runs-on: ubuntu-latest
@@ -35,6 +39,9 @@ jobs:
 
       - name: Test version script
         run: node --test scripts/version.test.mjs
+
+      - name: Test backend deployment script
+        run: node --test ../infra/backend/deploy.test.mjs
 
       - name: Resolve and update application version
         id: version
@@ -103,9 +110,11 @@ jobs:
   publish:
     name: Publish Docker image and save version
     if: github.event_name == 'workflow_dispatch'
-    needs: build
+    needs: [build, database-test]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      digest: ${{ steps.docker-build.outputs.digest }}
     permissions:
       contents: write
     steps:
@@ -156,6 +165,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and publish Docker image
+        id: docker-build
         uses: docker/build-push-action@v7
         with:
           context: ./backend
@@ -180,3 +190,40 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m "chore(backend): release $APP_VERSION"
           git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+
+  deploy:
+    name: Deploy backend via SSH
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: backend-production
+      cancel-in-progress: false
+    steps:
+      - name: Check out deployment files
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Deploy published image
+        shell: bash
+        env:
+          SSH_HOST: ${{ vars.SSH_HOST }}
+          SSH_USER: ${{ vars.SSH_USER }}
+          SSH_PORT: ${{ vars.SSH_PORT || '22' }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/lions/backend' }}
+          DATABASE_DEPLOY_PATH: ${{ vars.DATABASE_DEPLOY_PATH || '/opt/lions/database' }}
+          BACKEND_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}@${{ needs.publish.outputs.digest }}
+          APP_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          bash infra/scripts/deploy-via-ssh.sh backend
+          {
+            echo '### Backend implantado'
+            echo "- Versão: $APP_VERSION"
+            echo "- Imagem: $BACKEND_IMAGE"
+            echo '- Healthcheck: aprovado'
+          } >> "$GITHUB_STEP_SUMMARY"

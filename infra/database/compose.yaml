@@ -1,0 +1,36 @@
+name: lions-database
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure a senha do administrador}
+      APP_DB_NAME: ${APP_DB_NAME:-lionsdb}
+      APP_DB_USER: ${APP_DB_USER:-lions}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Configure a senha da aplicação}
+      TZ: America/Sao_Paulo
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-app-db.sh:/docker-entrypoint-initdb.d/10-app-db.sh:ro
+    networks:
+      - database
+    healthcheck:
+      # TCP evita aprovar o servidor temporário de inicialização (somente socket).
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U postgres -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+volumes:
+  postgres_data:
+    external: true
+    name: lions-postgres-data
+
+networks:
+  database:
+    name: lions-internal
+    internal: true

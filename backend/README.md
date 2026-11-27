@@ -34,6 +34,11 @@ java -jar build/libs/ortoempresta-backend-0.0.1-SNAPSHOT.jar
 ```
 
 O Flyway aplica `src/main/resources/db/migration` e o Hibernate só valida o schema (`ddl-auto: validate`).
+Para publicar no Docker Hub e fazer deploy via SSH pelo workflow manual, consulte
+[`infra/backend/README.md`](../infra/backend/README.md).
+O PostgreSQL na mesma VM é preparado pelo workflow **Database CI/CD**, descrito
+em [`infra/database/README.md`](../infra/database/README.md).
+
 Para rodar a suíte de testes contra um PostgreSQL vazio:
 
 ```bash
